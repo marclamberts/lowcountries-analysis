@@ -5,10 +5,7 @@ import plotly.express as px
 # =====================================================
 # PAGE CONFIG
 # =====================================================
-st.set_page_config(
-    page_title="Estimated Plus-Minus (EPM)",
-    layout="wide"
-)
+st.set_page_config(page_title="Estimated Plus-Minus (EPM)", layout="wide")
 
 # =====================================================
 # THEME
@@ -24,7 +21,6 @@ st.markdown(
         background-color: {BG};
         color: {TEXT};
     }}
-
     thead tr th {{
         background-color: {BG} !important;
         color: {TEXT} !important;
@@ -33,13 +29,6 @@ st.markdown(
     tbody tr td {{
         font-size: 12px;
         padding: 6px;
-    }}
-
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="select"] > div {{
-        background-color: #111827;
-        border-radius: 6px;
-        height: 36px;
     }}
     </style>
     """,
@@ -68,27 +57,25 @@ st.markdown(
 )
 
 # =====================================================
-# CONTROLS (RIGHT)
+# CONTROLS
 # =====================================================
-ctrl_l, ctrl_r = st.columns([5, 2])
+_, ctrl = st.columns([4, 1.6])
 
-with ctrl_r:
+with ctrl:
     c1, c2 = st.columns([1, 1.4])
 
-    with c1:
-        season = st.selectbox(
-            "Season",
-            list(EPM_FILES.keys()),
-            index=3,
-            label_visibility="collapsed"
-        )
+    season = c1.selectbox(
+        "Season",
+        list(EPM_FILES.keys()),
+        index=3,
+        label_visibility="collapsed"
+    )
 
-    with c2:
-        search = st.text_input(
-            "🔍",
-            placeholder="Search player",
-            label_visibility="collapsed"
-        )
+    search = c2.text_input(
+        "🔍",
+        placeholder="Search player",
+        label_visibility="collapsed"
+    )
 
 # =====================================================
 # LOAD DATA
@@ -97,20 +84,11 @@ epm = pd.read_excel(EPM_FILES[season])
 events = pd.read_excel(EVENT_FILE)
 
 df = epm.merge(
-    events[
-        [
-            "playerName",
-            "Position",
-            "Team within selected timeframe"
-        ]
-    ],
+    events[["playerName", "Position", "Team within selected timeframe"]],
     on="playerName",
     how="left"
 )
 
-# =====================================================
-# FILTER
-# =====================================================
 if search:
     df = df[df["playerName"].str.contains(search, case=False, na=False)]
 
@@ -136,14 +114,7 @@ with left:
         ]
     ].copy()
 
-    table.columns = [
-        "PLAYER",
-        "TEAM",
-        "POS",
-        "OFF",
-        "DEF",
-        "EPM",
-    ]
+    table.columns = ["PLAYER", "TEAM", "POS", "OFF", "DEF", "EPM"]
 
     def epm_color(val):
         if val >= 2.5: return "background-color:#14532d"
@@ -155,7 +126,7 @@ with left:
 
     styled = (
         table.style
-        .applymap(epm_color, subset=["OFF", "DEF", "EPM"])
+        .map(epm_color, subset=["OFF", "DEF", "EPM"])
         .format({
             "OFF": "{:+.2f}",
             "DEF": "{:+.2f}",
@@ -168,22 +139,15 @@ with left:
         })
     )
 
-    st.dataframe(
-        styled,
-        use_container_width=True,
-        height=760
-    )
+    st.dataframe(styled, height=760, width="stretch")
 
 # =====================================================
 # BEESWARM (RIGHT)
 # =====================================================
 with right:
-    beeswarm = df.copy()
-
     fig = px.strip(
-        beeswarm,
+        df,
         y="Total EPM",
-        x=[""] * len(beeswarm),   # forces vertical swarm
         hover_data={
             "playerName": True,
             "Team within selected timeframe": True,
@@ -191,24 +155,23 @@ with right:
             "Total EPM": ":.2f",
         },
         color="Total EPM",
-        color_continuous_scale=["#7f1d1d", "#374151", "#22c55e"],
     )
 
     fig.update_traces(
         jitter=0.35,
-        marker=dict(size=7, opacity=0.8)
+        marker=dict(
+            size=7,
+            opacity=0.85,
+            colorscale=["#7f1d1d", "#374151", "#22c55e"],
+            showscale=False
+        )
     )
 
     fig.update_layout(
         height=780,
-        showlegend=False,
         paper_bgcolor=BG,
         plot_bgcolor=BG,
-        xaxis=dict(
-            showgrid=False,
-            showticklabels=False,
-            zeroline=False,
-        ),
+        xaxis=dict(showgrid=False, showticklabels=False),
         yaxis=dict(
             title="Estimated Plus-Minus",
             gridcolor=GRID,
@@ -217,20 +180,15 @@ with right:
             titlefont=dict(color="white"),
         ),
         margin=dict(l=40, r=40, t=20, b=40),
-        coloraxis_showscale=False,
+        showlegend=False,
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 # =====================================================
 # FOOTER
 # =====================================================
 st.markdown(
-    """
-    <small>
-    Expected Plus-Minus • Eredivisie  
-    Modeled from event-level data
-    </small>
-    """,
+    "<small>EPM • Eredivisie • Event-level model</small>",
     unsafe_allow_html=True
 )
