@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # =====================================================
 # PAGE CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="Eredivisie Estimated Plus-Minus",
+    page_title="Estimated Plus-Minus (EPM)",
     layout="wide"
 )
 
@@ -24,7 +25,6 @@ st.markdown(
         color: {TEXT};
     }}
 
-    /* Table */
     thead tr th {{
         background-color: {BG} !important;
         color: {TEXT} !important;
@@ -35,13 +35,7 @@ st.markdown(
         padding: 6px;
     }}
 
-    /* Inputs */
-    div[data-baseweb="input"] > div {{
-        background-color: #111827;
-        border-radius: 6px;
-        height: 36px;
-    }}
-
+    div[data-baseweb="input"] > div,
     div[data-baseweb="select"] > div {{
         background-color: #111827;
         border-radius: 6px;
@@ -65,20 +59,6 @@ EPM_FILES = {
 }
 
 # =====================================================
-# COLOR FUNCTIONS
-# =====================================================
-def epm_bg(val):
-    if val >= 2.5: return "background-color:#14532d"
-    if val >= 1.5: return "background-color:#166534"
-    if val >= 0.5: return "background-color:#1f2937"
-    if val >= -0.5: return "background-color:#374151"
-    if val >= -1.5: return "background-color:#7f1d1d"
-    return "background-color:#450a0a"
-
-def neutral_bg(_):
-    return "background-color:#111827"
-
-# =====================================================
 # HEADER
 # =====================================================
 st.markdown("## Estimated Plus-Minus (EPM)")
@@ -88,7 +68,7 @@ st.markdown(
 )
 
 # =====================================================
-# CONTROLS (RIGHT-ALIGNED)
+# CONTROLS (RIGHT)
 # =====================================================
 ctrl_l, ctrl_r = st.columns([5, 2])
 
@@ -121,10 +101,7 @@ df = epm.merge(
         [
             "playerName",
             "Position",
-            "Team within selected timeframe",
-            "Goals",
-            "Assists",
-            "Key passes"
+            "Team within selected timeframe"
         ]
     ],
     on="playerName",
@@ -140,61 +117,110 @@ if search:
 df = df.sort_values("Total EPM", ascending=False).reset_index(drop=True)
 
 # =====================================================
-# TABLE
+# LAYOUT
 # =====================================================
-table = df[
-    [
-        "playerName",
-        "Team within selected timeframe",
-        "Position",
-        "Offensive EPM",
-        "Defensive EPM",
-        "Total EPM",
-        "Goals",
-        "Assists",
-        "Key passes",
+left, right = st.columns([1.2, 1])
+
+# =====================================================
+# TABLE (LEFT)
+# =====================================================
+with left:
+    table = df[
+        [
+            "playerName",
+            "Team within selected timeframe",
+            "Position",
+            "Offensive EPM",
+            "Defensive EPM",
+            "Total EPM",
+        ]
+    ].copy()
+
+    table.columns = [
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "OFF",
+        "DEF",
+        "EPM",
     ]
-].copy()
 
-table.columns = [
-    "PLAYER",
-    "TEAM",
-    "POS",
-    "OFF",
-    "DEF",
-    "EPM",
-    "G",
-    "A",
-    "KP",
-]
+    def epm_color(val):
+        if val >= 2.5: return "background-color:#14532d"
+        if val >= 1.5: return "background-color:#166534"
+        if val >= 0.5: return "background-color:#1f2937"
+        if val >= -0.5: return "background-color:#374151"
+        if val >= -1.5: return "background-color:#7f1d1d"
+        return "background-color:#450a0a"
 
-styled = (
-    table.style
-    .applymap(epm_bg, subset=["OFF", "DEF", "EPM"])
-    .applymap(neutral_bg, subset=["PLAYER", "TEAM", "POS", "G", "A", "KP"])
-    .format({
-        "OFF": "{:+.2f}",
-        "DEF": "{:+.2f}",
-        "EPM": "{:+.2f}",
-        "G": "{:.0f}",
-        "A": "{:.0f}",
-        "KP": "{:.0f}",
-    })
-    .set_properties(**{
-        "color": TEXT,
-        "border": f"1px solid {GRID}",
-        "text-align": "center",
-    })
-    .set_table_styles([
-        {"selector": "th", "props": [("border", f"1px solid {GRID}")]}
-    ])
-)
+    styled = (
+        table.style
+        .applymap(epm_color, subset=["OFF", "DEF", "EPM"])
+        .format({
+            "OFF": "{:+.2f}",
+            "DEF": "{:+.2f}",
+            "EPM": "{:+.2f}",
+        })
+        .set_properties(**{
+            "color": TEXT,
+            "border": f"1px solid {GRID}",
+            "text-align": "center",
+        })
+    )
 
-st.dataframe(
-    styled,
-    use_container_width=True,
-    height=760
-)
+    st.dataframe(
+        styled,
+        use_container_width=True,
+        height=760
+    )
+
+# =====================================================
+# BEESWARM (RIGHT)
+# =====================================================
+with right:
+    beeswarm = df.copy()
+
+    fig = px.strip(
+        beeswarm,
+        y="Total EPM",
+        x=[""] * len(beeswarm),   # forces vertical swarm
+        hover_data={
+            "playerName": True,
+            "Team within selected timeframe": True,
+            "Position": True,
+            "Total EPM": ":.2f",
+        },
+        color="Total EPM",
+        color_continuous_scale=["#7f1d1d", "#374151", "#22c55e"],
+    )
+
+    fig.update_traces(
+        jitter=0.35,
+        marker=dict(size=7, opacity=0.8)
+    )
+
+    fig.update_layout(
+        height=780,
+        showlegend=False,
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        xaxis=dict(
+            showgrid=False,
+            showticklabels=False,
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title="Estimated Plus-Minus",
+            gridcolor=GRID,
+            zerolinecolor=GRID,
+            tickfont=dict(color="white"),
+            titlefont=dict(color="white"),
+        ),
+        margin=dict(l=40, r=40, t=20, b=40),
+        coloraxis_showscale=False,
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
 # FOOTER
