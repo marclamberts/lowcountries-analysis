@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from io import BytesIO
 
 # =====================================================
 # APP CONFIG
@@ -24,9 +24,7 @@ def percentile_color(p):
 st.markdown(
     f"""
     <style>
-        .stApp {{
-            background-color: {BG};
-        }}
+        .stApp {{ background-color: {BG}; }}
     </style>
     """,
     unsafe_allow_html=True
@@ -45,17 +43,30 @@ EPM_FILES = {
 }
 
 # =====================================================
-# LOAD EVENT METRICS
+# LOAD DATA
 # =====================================================
 events = pd.read_excel(EVENT_METRICS_FILE)
 
-PLAYER = st.selectbox(
+# =====================================================
+# SIDEBAR FILTERS
+# =====================================================
+st.sidebar.header("Filters")
+
+PLAYER = st.sidebar.selectbox(
     "Select Player",
     sorted(events["playerName"].unique())
 )
 
-row = events[events["playerName"] == PLAYER].iloc[0]
+SEASONS = st.sidebar.multiselect(
+    "Select Seasons",
+    list(EPM_FILES.keys()),
+    default=list(EPM_FILES.keys())
+)
 
+# =====================================================
+# PLAYER INFO
+# =====================================================
+row = events[events["playerName"] == PLAYER].iloc[0]
 POSITION = row["Position"]
 AGE = int(row["Age"])
 TEAM = row["Team within selected timeframe"]
@@ -77,7 +88,7 @@ ref_events = events[
 ].copy()
 
 # =====================================================
-# EVENT METRIC PERCENTILES (POSITION PEERS)
+# EVENT METRIC PERCENTILES
 # =====================================================
 METRICS = [
     "Goals", "Assists", "Key passes",
@@ -90,14 +101,13 @@ for m in METRICS:
 player = ref_events[ref_events["playerName"] == PLAYER].iloc[0]
 
 # =====================================================
-# EPM TRENDS (POSITION PEERS)
+# EPM TRENDS (FILTERED BY SEASON + POSITION)
 # =====================================================
 trend = []
-
 position_players = set(ref_events["playerName"])
 
-for season, file in EPM_FILES.items():
-    df = pd.read_excel(file)
+for season in SEASONS:
+    df = pd.read_excel(EPM_FILES[season])
     df = df[df["playerName"].isin(position_players)].copy()
 
     for c in ["Offensive EPM", "Defensive EPM", "Total EPM"]:
@@ -127,7 +137,6 @@ with left:
     st.markdown(f"## {PLAYER.upper()}")
     st.markdown(f"**{TEAM} • {POSITION}**")
 
-    # WAR BAR
     st.markdown(
         f"""
         <div style="background:#1e293b;height:10px;border-radius:6px;">
@@ -135,24 +144,22 @@ with left:
                         background:{percentile_color(latest['Total'])};
                         height:10px;border-radius:6px;"></div>
         </div>
-        <p style="margin-top:6px;">{latest['Total']:.0f}%</p>
+        <p>{latest['Total']:.0f}%</p>
         """,
         unsafe_allow_html=True
     )
 
-    # BIG TILE + INFO
     c1, c2 = st.columns([1, 1.2])
 
     with c1:
         st.markdown(
             f"""
-            <div style="
-                background:{percentile_color(latest['Total'])};
-                padding:40px;
-                text-align:center;
-                font-size:56px;
-                font-weight:800;
-                border-radius:8px;">
+            <div style="background:{percentile_color(latest['Total'])};
+                        padding:40px;
+                        text-align:center;
+                        font-size:56px;
+                        font-weight:800;
+                        border-radius:8px;">
                 {latest['Total']:.0f}%
             </div>
             """,
@@ -165,9 +172,6 @@ with left:
             **POSITION GROUP**  
             {GROUP}  
 
-            **ROLE**  
-            Advanced Playmaker  
-
             **AGE**  
             {AGE}  
 
@@ -176,9 +180,6 @@ with left:
             """
         )
 
-    st.markdown("###")
-
-    # SMALL TILES
     tiles = [
         ("OFF EPM", latest["Off"]),
         ("DEF EPM", latest["Def"]),
@@ -195,67 +196,54 @@ with left:
         with cols[i % 4]:
             st.markdown(
                 f"""
-                <div style="
-                    background:{percentile_color(val)};
-                    padding:24px;
-                    text-align:center;
-                    border-radius:6px;">
+                <div style="background:{percentile_color(val)};
+                            padding:24px;
+                            text-align:center;
+                            border-radius:6px;">
                     <div style="font-size:28px;font-weight:700;">
                         {val:.0f}%
                     </div>
                 </div>
-                <div style="text-align:center;margin-bottom:12px;">
-                    <small>{label}</small>
-                </div>
+                <small>{label}</small>
                 """,
                 unsafe_allow_html=True
             )
 
-    st.markdown(
-        f"""
-        <small>
-        Percentiles vs {GROUP}<br>
-        3-Year Weighted Avg • Eredivisie
-        </small>
-        """,
-        unsafe_allow_html=True
-    )
-
 # =====================================================
-# RIGHT PANEL — GRAPHS
+# RIGHT PANEL — GRAPHS + EXPORT PNG
 # =====================================================
 with right:
     fig, ax = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
     fig.patch.set_facecolor(BG)
-    fig.patch.set_alpha(0)
 
     for a in ax:
         a.set_facecolor(BG)
-        a.patch.set_alpha(0)
         a.tick_params(colors="white")
         for s in a.spines.values():
             s.set_color(GRID)
         a.grid(color=GRID, alpha=0.25)
 
-    # WAR TREND
-    ax[0].plot(
-        trend["Season"],
-        trend["Total"],
-        lw=3,
-        marker="o",
-        color="white"
-    )
+    ax[0].plot(trend["Season"], trend["Total"], lw=3, marker="o", color="white")
     ax[0].set_ylim(0, 100)
-    ax[0].set_title("WAR PERCENTILE TREND",
-                    color="white", fontsize=15, fontweight="bold")
+    ax[0].set_title("WAR PERCENTILE TREND", color="white", fontweight="bold")
 
-    # EPM TREND
     ax[1].plot(trend["Season"], trend["Off"], "--", color="#38bdf8", label="Offense")
     ax[1].plot(trend["Season"], trend["Def"], "--", color="#fb923c", label="Defense")
     ax[1].plot(trend["Season"], trend["Total"], lw=3, color="#22c55e", label="Total")
     ax[1].set_ylim(0, 100)
-    ax[1].set_title("EPM PERCENTILE TREND",
-                    color="white", fontsize=15, fontweight="bold")
+    ax[1].set_title("EPM PERCENTILE TREND", color="white", fontweight="bold")
     ax[1].legend(facecolor=BG, edgecolor=GRID, labelcolor="white")
 
-    st.pyplot(fig, transparent=True)
+    st.pyplot(fig)
+
+    # EXPORT PNG
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", facecolor=BG)
+    buf.seek(0)
+
+    st.download_button(
+        "📥 Download PNG",
+        data=buf,
+        file_name=f"{PLAYER.replace(' ', '_')}_EPM_Card.png",
+        mime="image/png"
+    )
