@@ -27,13 +27,13 @@ st.markdown(
 # =====================================================
 # FILES
 # =====================================================
-EVENT_METRICS_FILE = "eredivisie_event_metrics_merged_final.xlsx"
+EVENT_METRICS_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
 
 EPM_FILES = {
-    "22–23": "Eredivisie EPM 2022-2023.xlsx",
-    "23–24": "Eredivisie EPM 2023-2024.xlsx",
-    "24–25": "Eredivisie EPM 2024-2025.xlsx",
-    "25–26": "Eredivisie EPM 2025-2026.xlsx",
+    "22–23": "data/Eredivisie EPM 2022-2023.xlsx",
+    "23–24": "data/Eredivisie EPM 2023-2024.xlsx",
+    "24–25": "data/Eredivisie EPM 2024-2025.xlsx",
+    "25–26": "data/Eredivisie EPM 2025-2026.xlsx",
 }
 
 # =====================================================
