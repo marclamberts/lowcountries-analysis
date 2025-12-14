@@ -1,19 +1,14 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 # =====================================================
 # PAGE CONFIG
 # =====================================================
-st.set_page_config(
-    page_title="EPM Player Profiles",
-    layout="wide",
-)
+st.set_page_config(layout="wide", page_title="EPM Player Card")
 
 # =====================================================
-# STYLE (DunksAndThrees inspired)
+# GLOBAL STYLE (dark card)
 # =====================================================
 st.markdown("""
 <style>
@@ -24,78 +19,91 @@ body {
 h1, h2, h3 {
     font-family: Inter, sans-serif;
 }
+.metric-box {
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 26px;
+}
+.label {
+    font-size: 12px;
+    opacity: 0.8;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================
 # FILES
 # =====================================================
-EVENT_METRICS_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
+EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
 
 EPM_FILES = {
-    "22–23": "data/Eredivisie EPM 2022-2023.xlsx",
-    "23–24": "data/Eredivisie EPM 2023-2024.xlsx",
     "24–25": "data/Eredivisie EPM 2024-2025.xlsx",
     "25–26": "data/Eredivisie EPM 2025-2026.xlsx",
 }
 
 # =====================================================
-# HELPERS
+# POSITION GROUPS
 # =====================================================
 ATTACK = ["CF", "ST", "LW", "RW", "SS"]
 MIDFIELD = ["AMF", "CM", "DMF", "RCMF", "LCMF"]
 DEFENSE = ["CB", "LB", "RB", "LCB", "RCB", "LWB", "RWB"]
 
-def detect_position_group(pos):
-    if isinstance(pos, str):
-        if any(p in pos for p in ATTACK):
-            return "Attackers"
-        if any(p in pos for p in MIDFIELD):
-            return "Midfielders"
-        if any(p in pos for p in DEFENSE):
-            return "Defenders"
+def position_group(pos):
+    if not isinstance(pos, str):
+        return "Other"
+    if any(p in pos for p in ATTACK):
+        return "Attackers"
+    if any(p in pos for p in MIDFIELD):
+        return "Midfielders"
+    if any(p in pos for p in DEFENSE):
+        return "Defenders"
     return "Other"
 
-def percentile_color(p):
+def pct_color(p):
     if p >= 90: return "#22c55e"
     if p >= 75: return "#38bdf8"
     if p >= 50: return "#64748b"
     if p >= 25: return "#475569"
-    return "#1f2937"
+    return "#334155"
 
 # =====================================================
 # LOAD DATA
 # =====================================================
 @st.cache_data
 def load_events():
-    return pd.read_excel(EVENT_METRICS_FILE)
+    df = pd.read_excel(EVENT_FILE)
+    df["PosGroup"] = df["Position"].apply(position_group)
+    return df
 
 events = load_events()
-events["PosGroup"] = events["Position"].apply(detect_position_group)
 
 # =====================================================
-# SIDEBAR (LIKE DUNKSANDTHREES)
+# SIDEBAR
 # =====================================================
 st.sidebar.title("EPM Explorer")
 
-player = st.sidebar.selectbox(
-    "Select player",
+PLAYER = st.sidebar.selectbox(
+    "Player",
     sorted(events["playerName"].unique())
 )
 
-role = st.sidebar.text_input("Role", "Advanced Playmaker")
+ROLE = st.sidebar.text_input("Role", "Advanced Playmaker")
 
-player_row = events[events["playerName"] == player].iloc[0]
+player_row = events[events["playerName"] == PLAYER].iloc[0]
 
-team = player_row["Team within selected timeframe"]
-age = int(player_row["Age"])
-position = player_row["Position"]
-pos_group = player_row["PosGroup"]
+TEAM = player_row["Team within selected timeframe"]
+POSITION = player_row["Position"]
+AGE = int(player_row["Age"])
+POS_GROUP = player_row["PosGroup"]
 
 # =====================================================
 # POSITIONAL REFERENCE GROUP
 # =====================================================
-ref_events = events[events["PosGroup"] == pos_group].copy()
+ref = events[events["PosGroup"] == POS_GROUP].copy()
 
 METRICS = [
     "Goals", "Assists", "Key passes",
@@ -103,23 +111,23 @@ METRICS = [
 ]
 
 for m in METRICS:
-    ref_events[m + "_pct"] = ref_events[m].rank(pct=True) * 100
+    ref[m + "_pct"] = ref[m].rank(pct=True) * 100
 
-player_event = ref_events[ref_events["playerName"] == player].iloc[0]
+player = ref[ref["playerName"] == PLAYER].iloc[0]
 
 # =====================================================
-# LOAD EPM (POSITION FILTERED)
+# LOAD EPM (FILTERED BY POSITION GROUP)
 # =====================================================
 trend = []
 
 for season, path in EPM_FILES.items():
     df = pd.read_excel(path)
-    df = df[df["playerName"].isin(ref_events["playerName"])]
+    df = df[df["playerName"].isin(ref["playerName"])]
 
     for c in ["Offensive EPM", "Defensive EPM", "Total EPM"]:
         df[c + "_pct"] = df[c].rank(pct=True) * 100
 
-    row = df[df["playerName"] == player]
+    row = df[df["playerName"] == PLAYER]
     if not row.empty:
         trend.append({
             "Season": season,
@@ -135,73 +143,94 @@ latest = trend_df.iloc[-1]
 # HEADER
 # =====================================================
 st.markdown(f"""
-<h1>{player}</h1>
-<b>{team}</b> • {position} • Age {age}<br>
-<small>{pos_group} percentile ranks</small>
+<h1>{PLAYER.upper()}</h1>
+<b>{TEAM}</b> • {POSITION}<br>
 """, unsafe_allow_html=True)
 
-# WAR BAR
 st.progress(latest["Total"] / 100)
-st.caption(f"Projected WAR percentile: **{latest['Total']:.0f}%**")
-
-st.divider()
+st.markdown(f"**{latest['Total']:.0f}%**")
 
 # =====================================================
 # MAIN LAYOUT
 # =====================================================
-col_left, col_right = st.columns([1.3, 1])
+left, right = st.columns([1.25, 1])
 
 # =====================================================
-# LEFT – METRIC TILES
+# LEFT COLUMN
 # =====================================================
-with col_left:
-    st.subheader("Player Impact Profile")
+with left:
+    # BIG WAR TILE
+    st.markdown(f"""
+    <div style="background:{pct_color(latest['Total'])};
+                padding:28px;
+                width:260px;
+                border-radius:6px;
+                font-size:54px;
+                font-weight:900;
+                text-align:center;">
+        {latest['Total']:.0f}%
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    **POSITION GROUP**  
+    {POS_GROUP}  
+
+    **ROLE**  
+    {ROLE}  
+
+    **AGE**  
+    {AGE}  
+
+    **TEAM**  
+    {TEAM}
+    """)
+
+    st.markdown("---")
 
     tiles = [
-        ("Offensive EPM", latest["Off"]),
-        ("Defensive EPM", latest["Def"]),
-        ("Goals", player_event["Goals_pct"]),
-        ("Assists", player_event["Assists_pct"]),
-        ("Key Passes", player_event["Key passes_pct"]),
-        ("Tackles", player_event["Tackles_pct"]),
-        ("Interceptions", player_event["Interceptions_pct"]),
-        ("Aerial Duels", player_event["Aerial duels won, %_pct"]),
+        ("OFF EPM", latest["Off"]),
+        ("DEF EPM", latest["Def"]),
+        ("GOALS", player["Goals_pct"]),
+        ("ASSISTS", player["Assists_pct"]),
+        ("KEY PASSES", player["Key passes_pct"]),
+        ("TACKLES", player["Tackles_pct"]),
+        ("INTERCEPTIONS", player["Interceptions_pct"]),
+        ("AERIAL DUELS", player["Aerial duels won, %_pct"]),
     ]
 
     cols = st.columns(4)
-    for i, (label, val) in enumerate(tiles):
+    for i, (lab, val) in enumerate(tiles):
         with cols[i % 4]:
             st.markdown(
                 f"""
-                <div style="
-                    background:{percentile_color(val)};
-                    padding:12px;
-                    border-radius:6px;
-                    text-align:center;">
-                <div style="font-size:22px;font-weight:800;">{val:.0f}%</div>
-                <div style="font-size:11px;opacity:0.85;">{label}</div>
+                <div class="label">{lab}</div>
+                <div class="metric-box" style="background:{pct_color(val)};">
+                    {val:.0f}%
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-# =====================================================
-# RIGHT – GRAPHS
-# =====================================================
-with col_right:
-    st.subheader("Trends")
+    st.caption(f"Percentiles vs {POS_GROUP}")
 
-    fig, ax = plt.subplots(2, 1, figsize=(5, 6), sharex=True)
+# =====================================================
+# RIGHT COLUMN (GRAPHS)
+# =====================================================
+with right:
+    fig, ax = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
 
+    # WAR trend
     ax[0].plot(trend_df["Season"], trend_df["Total"], marker="o", lw=3)
-    ax[0].set_title("WAR Percentile")
+    ax[0].set_title("WAR PERCENTILE TREND", fontsize=14, fontweight="bold")
     ax[0].set_ylim(0, 100)
     ax[0].grid(alpha=0.25)
 
-    ax[1].plot(trend_df["Season"], trend_df["Off"], "--", label="Off")
-    ax[1].plot(trend_df["Season"], trend_df["Def"], "--", label="Def")
+    # EPM trend
+    ax[1].plot(trend_df["Season"], trend_df["Off"], "--", label="Offense")
+    ax[1].plot(trend_df["Season"], trend_df["Def"], "--", label="Defense")
     ax[1].plot(trend_df["Season"], trend_df["Total"], lw=3, label="Total")
-    ax[1].set_title("EPM Percentiles")
+    ax[1].set_title("EPM PERCENTILE TREND", fontsize=14, fontweight="bold")
     ax[1].set_ylim(0, 100)
     ax[1].legend()
     ax[1].grid(alpha=0.25)
@@ -211,6 +240,4 @@ with col_right:
 # =====================================================
 # FOOTER
 # =====================================================
-st.caption(
-    "Estimated Plus-Minus (EPM) • Position-adjusted percentiles • Eredivisie"
-)
+st.caption("3-Year Weighted Avg • Position-adjusted percentiles • Eredivisie")
