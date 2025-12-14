@@ -16,6 +16,7 @@ st.set_page_config(
 BG = "#0b1220"
 GRID = "#334155"
 TEXT = "#e5e7eb"
+DOT = "#e5e7eb"
 
 # =====================================================
 # GLOBAL STYLE
@@ -29,11 +30,11 @@ st.markdown(
         }}
 
         div[data-baseweb="select"] {{
-            max-width: 220px;
+            max-width: 200px;
         }}
 
         input {{
-            max-width: 220px;
+            max-width: 200px;
         }}
     </style>
     """,
@@ -59,7 +60,6 @@ def load_data():
         on="playerName",
         how="left"
     )
-
     return df
 
 df = load_data()
@@ -80,7 +80,7 @@ st.markdown(
 # =====================================================
 # FILTER BAR
 # =====================================================
-f1, f2, f3 = st.columns([2.5, 1, 1])
+f1, f2, f3 = st.columns([3, 1, 1])
 
 with f2:
     season = st.selectbox(
@@ -91,8 +91,8 @@ with f2:
 
 with f3:
     search = st.text_input(
-        "🔍 Search player",
-        placeholder="Search player...",
+        "🔍",
+        placeholder="Search player",
         label_visibility="collapsed"
     )
 
@@ -111,24 +111,22 @@ if search:
 # =====================================================
 # MAIN LAYOUT
 # =====================================================
-left, right = st.columns([1.1, 1])
+left, right = st.columns([1.15, 1])
 
 # =====================================================
-# LEFT — TABLE
+# LEFT — TABLE ONLY
 # =====================================================
 with left:
 
-    display_cols = [
-        "playerName",
-        "Team within selected timeframe",
-        "Position",
-        "Offensive EPM",
-        "Defensive EPM",
-        "Total EPM",
-    ]
-
     table_show = (
-        table_df[display_cols]
+        table_df[[
+            "playerName",
+            "Team within selected timeframe",
+            "Position",
+            "Offensive EPM",
+            "Defensive EPM",
+            "Total EPM",
+        ]]
         .rename(columns={
             "playerName": "PLAYER",
             "Team within selected timeframe": "TEAM",
@@ -148,14 +146,12 @@ with left:
     )
 
 # =====================================================
-# RIGHT — BEESWARM
+# RIGHT — BEESWARM (NO COLOR SCALE ❗)
 # =====================================================
 with right:
 
-    beeswarm_df = df.copy()
-
     fig = px.strip(
-        beeswarm_df,
+        df,
         y="Total EPM",
         hover_data={
             "playerName": True,
@@ -163,14 +159,13 @@ with right:
             "Position": True,
             "Total EPM": ":.2f",
         },
-        color="Total EPM",
-        color_continuous_scale=["#7f1d1d", "#374151", "#22c55e"],
     )
 
     fig.update_traces(
         jitter=0.35,
         marker=dict(
             size=7,
+            color=DOT,
             opacity=0.85,
         )
     )
@@ -192,7 +187,6 @@ with right:
             tickfont=dict(color=TEXT),
             titlefont=dict(color=TEXT),
         ),
-        coloraxis_showscale=False,
         showlegend=False,
     )
 
@@ -205,8 +199,7 @@ st.markdown(
     """
     <hr style="border-color:#334155;">
     <small style="color:#9ca3af;">
-        Data: Eredivisie • Model inspired by dunksandthrees.com<br>
-        Hover dots for details • Click player rows to extend to player cards
+        Hover dots for player details • Inspired by dunksandthrees.com
     </small>
     """,
     unsafe_allow_html=True
