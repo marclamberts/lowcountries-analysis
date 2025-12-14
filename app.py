@@ -5,31 +5,36 @@ import plotly.express as px
 # =====================================================
 # PAGE CONFIG
 # =====================================================
-st.set_page_config(page_title="Estimated Plus-Minus (EPM)", layout="wide")
+st.set_page_config(
+    page_title="Eredivisie EPM",
+    layout="wide",
+)
 
 # =====================================================
-# THEME
+# COLORS
 # =====================================================
-BG = "#0f1117"
-GRID = "#2a2f3a"
+BG = "#0b1220"
+GRID = "#334155"
 TEXT = "#e5e7eb"
 
+# =====================================================
+# GLOBAL STYLE
+# =====================================================
 st.markdown(
     f"""
     <style>
-    .stApp {{
-        background-color: {BG};
-        color: {TEXT};
-    }}
-    thead tr th {{
-        background-color: {BG} !important;
-        color: {TEXT} !important;
-        font-size: 12px;
-    }}
-    tbody tr td {{
-        font-size: 12px;
-        padding: 6px;
-    }}
+        .stApp {{
+            background-color: {BG};
+            color: {TEXT};
+        }}
+
+        div[data-baseweb="select"] {{
+            max-width: 220px;
+        }}
+
+        input {{
+            max-width: 220px;
+        }}
     </style>
     """,
     unsafe_allow_html=True
@@ -39,114 +44,118 @@ st.markdown(
 # FILES
 # =====================================================
 EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
-
-EPM_FILES = {
-    "2022–23": "data/Eredivisie EPM 2022-2023.xlsx",
-    "2023–24": "data/Eredivisie EPM 2023-2024.xlsx",
-    "2024–25": "data/Eredivisie EPM 2024-2025.xlsx",
-    "2025–26": "data/Eredivisie EPM 2025-2026.xlsx",
-}
-
-# =====================================================
-# HEADER
-# =====================================================
-st.markdown("## Estimated Plus-Minus (EPM)")
-st.markdown(
-    "<small>Expected impact using event-level Eredivisie data</small>",
-    unsafe_allow_html=True
-)
-
-# =====================================================
-# CONTROLS
-# =====================================================
-_, ctrl = st.columns([4, 1.6])
-
-with ctrl:
-    c1, c2 = st.columns([1, 1.4])
-
-    season = c1.selectbox(
-        "Season",
-        list(EPM_FILES.keys()),
-        index=3,
-        label_visibility="collapsed"
-    )
-
-    search = c2.text_input(
-        "🔍",
-        placeholder="Search player",
-        label_visibility="collapsed"
-    )
+EPM_FILE = "data/Eredivisie EPM 2023-2024.xlsx"
 
 # =====================================================
 # LOAD DATA
 # =====================================================
-epm = pd.read_excel(EPM_FILES[season])
-events = pd.read_excel(EVENT_FILE)
+@st.cache_data
+def load_data():
+    events = pd.read_excel(EVENT_FILE)
+    epm = pd.read_excel(EPM_FILE)
 
-df = epm.merge(
-    events[["playerName", "Position", "Team within selected timeframe"]],
-    on="playerName",
-    how="left"
-)
-
-if search:
-    df = df[df["playerName"].str.contains(search, case=False, na=False)]
-
-df = df.sort_values("Total EPM", ascending=False).reset_index(drop=True)
-
-# =====================================================
-# LAYOUT
-# =====================================================
-left, right = st.columns([1.2, 1])
-
-# =====================================================
-# TABLE (LEFT)
-# =====================================================
-with left:
-    table = df[
-        [
-            "playerName",
-            "Team within selected timeframe",
-            "Position",
-            "Offensive EPM",
-            "Defensive EPM",
-            "Total EPM",
-        ]
-    ].copy()
-
-    table.columns = ["PLAYER", "TEAM", "POS", "OFF", "DEF", "EPM"]
-
-    def epm_color(val):
-        if val >= 2.5: return "background-color:#14532d"
-        if val >= 1.5: return "background-color:#166534"
-        if val >= 0.5: return "background-color:#1f2937"
-        if val >= -0.5: return "background-color:#374151"
-        if val >= -1.5: return "background-color:#7f1d1d"
-        return "background-color:#450a0a"
-
-    styled = (
-        table.style
-        .map(epm_color, subset=["OFF", "DEF", "EPM"])
-        .format({
-            "OFF": "{:+.2f}",
-            "DEF": "{:+.2f}",
-            "EPM": "{:+.2f}",
-        })
-        .set_properties(**{
-            "color": TEXT,
-            "border": f"1px solid {GRID}",
-            "text-align": "center",
-        })
+    df = events.merge(
+        epm[["playerName", "Offensive EPM", "Defensive EPM", "Total EPM"]],
+        on="playerName",
+        how="left"
     )
 
-    st.dataframe(styled, height=760, width="stretch")
+    return df
+
+df = load_data()
 
 # =====================================================
-# BEESWARM (RIGHT)
+# HEADER
+# =====================================================
+st.markdown(
+    """
+    <h1 style="margin-bottom:0;">Eredivisie Estimated Plus-Minus</h1>
+    <p style="color:#9ca3af;margin-top:4px;">
+        Player impact model • Percentiles • Interactive
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
+# =====================================================
+# FILTER BAR
+# =====================================================
+f1, f2, f3 = st.columns([2.5, 1, 1])
+
+with f2:
+    season = st.selectbox(
+        "Season",
+        ["2023–2024"],
+        label_visibility="collapsed"
+    )
+
+with f3:
+    search = st.text_input(
+        "🔍 Search player",
+        placeholder="Search player...",
+        label_visibility="collapsed"
+    )
+
+# =====================================================
+# FILTER DATA
+# =====================================================
+table_df = df.copy()
+
+if search:
+    table_df = table_df[
+        table_df["playerName"]
+        .str.lower()
+        .str.contains(search.lower())
+    ]
+
+# =====================================================
+# MAIN LAYOUT
+# =====================================================
+left, right = st.columns([1.1, 1])
+
+# =====================================================
+# LEFT — TABLE
+# =====================================================
+with left:
+
+    display_cols = [
+        "playerName",
+        "Team within selected timeframe",
+        "Position",
+        "Offensive EPM",
+        "Defensive EPM",
+        "Total EPM",
+    ]
+
+    table_show = (
+        table_df[display_cols]
+        .rename(columns={
+            "playerName": "PLAYER",
+            "Team within selected timeframe": "TEAM",
+            "Position": "POS",
+            "Offensive EPM": "OFF",
+            "Defensive EPM": "DEF",
+            "Total EPM": "EPM",
+        })
+        .sort_values("EPM", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    st.dataframe(
+        table_show,
+        height=780,
+        width="stretch",
+    )
+
+# =====================================================
+# RIGHT — BEESWARM
 # =====================================================
 with right:
+
+    beeswarm_df = df.copy()
+
     fig = px.strip(
-        df,
+        beeswarm_df,
         y="Total EPM",
         hover_data={
             "playerName": True,
@@ -155,6 +164,7 @@ with right:
             "Total EPM": ":.2f",
         },
         color="Total EPM",
+        color_continuous_scale=["#7f1d1d", "#374151", "#22c55e"],
     )
 
     fig.update_traces(
@@ -162,24 +172,27 @@ with right:
         marker=dict(
             size=7,
             opacity=0.85,
-            colorscale=["#7f1d1d", "#374151", "#22c55e"],
-            showscale=False
         )
     )
 
     fig.update_layout(
-        height=780,
+        height=820,
         paper_bgcolor=BG,
         plot_bgcolor=BG,
-        xaxis=dict(showgrid=False, showticklabels=False),
+        margin=dict(l=40, r=40, t=10, b=40),
+        xaxis=dict(
+            showgrid=False,
+            showticklabels=False,
+            zeroline=False,
+        ),
         yaxis=dict(
             title="Estimated Plus-Minus",
             gridcolor=GRID,
             zerolinecolor=GRID,
-            tickfont=dict(color="white"),
-            titlefont=dict(color="white"),
+            tickfont=dict(color=TEXT),
+            titlefont=dict(color=TEXT),
         ),
-        margin=dict(l=40, r=40, t=20, b=40),
+        coloraxis_showscale=False,
         showlegend=False,
     )
 
@@ -189,6 +202,12 @@ with right:
 # FOOTER
 # =====================================================
 st.markdown(
-    "<small>EPM • Eredivisie • Event-level model</small>",
+    """
+    <hr style="border-color:#334155;">
+    <small style="color:#9ca3af;">
+        Data: Eredivisie • Model inspired by dunksandthrees.com<br>
+        Hover dots for details • Click player rows to extend to player cards
+    </small>
+    """,
     unsafe_allow_html=True
 )
