@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(layout="wide", page_title="EPM Player Card")
 
 # =====================================================
-# GLOBAL STYLE (dark card)
+# STYLE
 # =====================================================
 st.markdown("""
 <style>
@@ -16,21 +16,20 @@ body {
     background-color: #0b1220;
     color: white;
 }
-h1, h2, h3 {
-    font-family: Inter, sans-serif;
-}
-.metric-box {
+.metric {
     border-radius: 6px;
-    padding: 16px;
+    padding: 18px;
     text-align: center;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 26px;
 }
 .label {
     font-size: 12px;
-    opacity: 0.8;
+    opacity: 0.75;
     font-weight: 600;
-    margin-bottom: 4px;
+}
+.big {
+    font-size: 56px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -48,9 +47,9 @@ EPM_FILES = {
 # =====================================================
 # POSITION GROUPS
 # =====================================================
-ATTACK = ["CF", "ST", "LW", "RW", "SS"]
+ATTACK = ["CF", "ST", "LW", "RW"]
 MIDFIELD = ["AMF", "CM", "DMF", "RCMF", "LCMF"]
-DEFENSE = ["CB", "LB", "RB", "LCB", "RCB", "LWB", "RWB"]
+DEFENSE = ["CB", "LB", "RB", "LCB", "RCB"]
 
 def position_group(pos):
     if not isinstance(pos, str):
@@ -84,8 +83,6 @@ events = load_events()
 # =====================================================
 # SIDEBAR
 # =====================================================
-st.sidebar.title("EPM Explorer")
-
 PLAYER = st.sidebar.selectbox(
     "Player",
     sorted(events["playerName"].unique())
@@ -101,7 +98,7 @@ AGE = int(player_row["Age"])
 POS_GROUP = player_row["PosGroup"]
 
 # =====================================================
-# POSITIONAL REFERENCE GROUP
+# POSITIONAL BENCHMARK
 # =====================================================
 ref = events[events["PosGroup"] == POS_GROUP].copy()
 
@@ -116,7 +113,7 @@ for m in METRICS:
 player = ref[ref["playerName"] == PLAYER].iloc[0]
 
 # =====================================================
-# LOAD EPM (FILTERED BY POSITION GROUP)
+# LOAD EPM (POSITION FILTERED)
 # =====================================================
 trend = []
 
@@ -144,7 +141,7 @@ latest = trend_df.iloc[-1]
 # =====================================================
 st.markdown(f"""
 <h1>{PLAYER.upper()}</h1>
-<b>{TEAM}</b> • {POSITION}<br>
+<b>{TEAM}</b> • {POSITION}
 """, unsafe_allow_html=True)
 
 st.progress(latest["Total"] / 100)
@@ -153,41 +150,41 @@ st.markdown(f"**{latest['Total']:.0f}%**")
 # =====================================================
 # MAIN LAYOUT
 # =====================================================
-left, right = st.columns([1.25, 1])
+left, right = st.columns([1.35, 1])
 
 # =====================================================
 # LEFT COLUMN
 # =====================================================
 with left:
-    # BIG WAR TILE
-    st.markdown(f"""
-    <div style="background:{pct_color(latest['Total'])};
-                padding:28px;
-                width:260px;
-                border-radius:6px;
-                font-size:54px;
-                font-weight:900;
-                text-align:center;">
-        {latest['Total']:.0f}%
-    </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-    **POSITION GROUP**  
-    {POS_GROUP}  
+    # --- BIG TILE + INFO ROW ---
+    tile_col, info_col = st.columns([0.9, 1.1])
 
-    **ROLE**  
-    {ROLE}  
+    with tile_col:
+        st.markdown(f"""
+        <div class="metric big" style="background:{pct_color(latest['Total'])};">
+            {latest['Total']:.0f}%
+        </div>
+        """, unsafe_allow_html=True)
 
-    **AGE**  
-    {AGE}  
+    with info_col:
+        st.markdown(f"""
+        <div class="label">POSITION GROUP</div>
+        <b>{POS_GROUP}</b><br><br>
 
-    **TEAM**  
-    {TEAM}
-    """)
+        <div class="label">ROLE</div>
+        <b>{ROLE}</b><br><br>
+
+        <div class="label">AGE</div>
+        <b>{AGE}</b><br><br>
+
+        <div class="label">TEAM</div>
+        <b>{TEAM}</b>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
+    # --- SMALL TILES GRID ---
     tiles = [
         ("OFF EPM", latest["Off"]),
         ("DEF EPM", latest["Def"]),
@@ -205,7 +202,7 @@ with left:
             st.markdown(
                 f"""
                 <div class="label">{lab}</div>
-                <div class="metric-box" style="background:{pct_color(val)};">
+                <div class="metric" style="background:{pct_color(val)};">
                     {val:.0f}%
                 </div>
                 """,
@@ -220,13 +217,11 @@ with left:
 with right:
     fig, ax = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
 
-    # WAR trend
-    ax[0].plot(trend_df["Season"], trend_df["Total"], marker="o", lw=3)
+    ax[0].plot(trend_df["Season"], trend_df["Total"], lw=3, marker="o")
     ax[0].set_title("WAR PERCENTILE TREND", fontsize=14, fontweight="bold")
     ax[0].set_ylim(0, 100)
     ax[0].grid(alpha=0.25)
 
-    # EPM trend
     ax[1].plot(trend_df["Season"], trend_df["Off"], "--", label="Offense")
     ax[1].plot(trend_df["Season"], trend_df["Def"], "--", label="Defense")
     ax[1].plot(trend_df["Season"], trend_df["Total"], lw=3, label="Total")
@@ -241,3 +236,4 @@ with right:
 # FOOTER
 # =====================================================
 st.caption("3-Year Weighted Avg • Position-adjusted percentiles • Eredivisie")
+st.caption("Data Source: Opta via StatsBomb • Created by Marc Lambert")
