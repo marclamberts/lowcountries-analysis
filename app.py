@@ -13,18 +13,29 @@ st.set_page_config(page_title="EPM Player Card", layout="wide")
 # =====================================================
 BG = "#0b1220"
 GRID = "#334155"
+TEXT = "#ffffff"
+MUTED = "#94a3b8"
 
 def percentile_color(p):
     if p >= 90: return "#22c55e"
     if p >= 75: return "#38bdf8"
-    if p >= 50: return "#64748b"
-    if p >= 25: return "#475569"
-    return "#1f2937"
+    if p >= 50: return "#e5e7eb"
+    if p >= 25: return "#94a3b8"
+    return "#64748b"
 
 st.markdown(
     f"""
     <style>
-        .stApp {{ background-color: {BG}; }}
+        .stApp {{
+            background-color: {BG};
+            color: {TEXT};
+        }}
+        h1, h2, h3, h4 {{
+            color: {TEXT};
+        }}
+        small {{
+            color: {MUTED};
+        }}
     </style>
     """,
     unsafe_allow_html=True
@@ -53,12 +64,12 @@ events = pd.read_excel(EVENT_METRICS_FILE)
 st.sidebar.header("Filters")
 
 PLAYER = st.sidebar.selectbox(
-    "Select Player",
+    "Player",
     sorted(events["playerName"].unique())
 )
 
 SEASONS = st.sidebar.multiselect(
-    "Select Seasons",
+    "Seasons",
     list(EPM_FILES.keys()),
     default=list(EPM_FILES.keys())
 )
@@ -72,7 +83,7 @@ AGE = int(row["Age"])
 TEAM = row["Team within selected timeframe"]
 
 # =====================================================
-# POSITION GROUP LOGIC
+# POSITION GROUP
 # =====================================================
 def position_group(pos):
     if any(p in pos for p in ["CF", "ST", "RW", "LW"]):
@@ -88,7 +99,7 @@ ref_events = events[
 ].copy()
 
 # =====================================================
-# EVENT METRIC PERCENTILES
+# EVENT METRICS (POSITION PEERS)
 # =====================================================
 METRICS = [
     "Goals", "Assists", "Key passes",
@@ -101,7 +112,7 @@ for m in METRICS:
 player = ref_events[ref_events["playerName"] == PLAYER].iloc[0]
 
 # =====================================================
-# EPM TRENDS (FILTERED BY SEASON + POSITION)
+# EPM TRENDS
 # =====================================================
 trend = []
 position_players = set(ref_events["playerName"])
@@ -128,40 +139,37 @@ latest = trend.iloc[-1]
 # =====================================================
 # LAYOUT
 # =====================================================
-left, right = st.columns([1.3, 1])
+left, right = st.columns([1.35, 1])
 
 # =====================================================
 # LEFT PANEL
 # =====================================================
 with left:
     st.markdown(f"## {PLAYER.upper()}")
-    st.markdown(f"**{TEAM} • {POSITION}**")
+    st.markdown(f"<small>{TEAM} • {POSITION}</small>", unsafe_allow_html=True)
 
+    # WAR BAR
     st.markdown(
         f"""
-        <div style="background:#1e293b;height:10px;border-radius:6px;">
+        <div style="background:{GRID};height:8px;border-radius:4px;">
             <div style="width:{latest['Total']}%;
                         background:{percentile_color(latest['Total'])};
-                        height:10px;border-radius:6px;"></div>
+                        height:8px;border-radius:4px;"></div>
         </div>
-        <p>{latest['Total']:.0f}%</p>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2 = st.columns([1, 1.2])
+    # BIG WAR + INFO
+    c1, c2 = st.columns([0.9, 1.1])
 
     with c1:
         st.markdown(
             f"""
-            <div style="background:{percentile_color(latest['Total'])};
-                        padding:40px;
-                        text-align:center;
-                        font-size:56px;
-                        font-weight:800;
-                        border-radius:8px;">
+            <div style="font-size:64px;font-weight:800;line-height:1;">
                 {latest['Total']:.0f}%
             </div>
+            <small>WAR Percentile</small>
             """,
             unsafe_allow_html=True
         )
@@ -169,17 +177,21 @@ with left:
     with c2:
         st.markdown(
             f"""
-            **POSITION GROUP**  
-            {GROUP}  
+            <small>POSITION GROUP</small><br>
+            <b>{GROUP}</b><br><br>
 
-            **AGE**  
-            {AGE}  
+            <small>AGE</small><br>
+            <b>{AGE}</b><br><br>
 
-            **TEAM**  
-            {TEAM}
-            """
+            <small>TEAM</small><br>
+            <b>{TEAM}</b>
+            """,
+            unsafe_allow_html=True
         )
 
+    st.markdown("---")
+
+    # SMALL TILES (TEXT ONLY)
     tiles = [
         ("OFF EPM", latest["Off"]),
         ("DEF EPM", latest["Def"]),
@@ -196,21 +208,29 @@ with left:
         with cols[i % 4]:
             st.markdown(
                 f"""
-                <div style="background:{percentile_color(val)};
-                            padding:24px;
-                            text-align:center;
-                            border-radius:6px;">
-                    <div style="font-size:28px;font-weight:700;">
-                        {val:.0f}%
-                    </div>
+                <div style="font-size:26px;font-weight:700;">
+                    {val:.0f}%
                 </div>
+                <div style="height:3px;width:30px;
+                            background:{percentile_color(val)};
+                            margin:6px 0;"></div>
                 <small>{label}</small>
                 """,
                 unsafe_allow_html=True
             )
 
+    st.markdown(
+        f"""
+        <small>
+        Percentiles vs {GROUP}<br>
+        Eredivisie • 3-Year Weighted Avg
+        </small>
+        """,
+        unsafe_allow_html=True
+    )
+
 # =====================================================
-# RIGHT PANEL — GRAPHS + EXPORT PNG
+# RIGHT PANEL — GRAPHS + EXPORT
 # =====================================================
 with right:
     fig, ax = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
@@ -238,7 +258,8 @@ with right:
 
     # EXPORT PNG
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", facecolor=BG)
+    fig.savefig(buf, format="png", dpi=200,
+                bbox_inches="tight", facecolor=BG)
     buf.seek(0)
 
     st.download_button(
