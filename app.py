@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 # =====================================================
 # PAGE CONFIG
@@ -11,7 +10,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# THEME (DunksAndThrees-like)
+# THEME
 # =====================================================
 BG = "#0f1117"
 GRID = "#2a2f3a"
@@ -24,6 +23,8 @@ st.markdown(
         background-color: {BG};
         color: {TEXT};
     }}
+
+    /* Table */
     thead tr th {{
         background-color: {BG} !important;
         color: {TEXT} !important;
@@ -32,6 +33,19 @@ st.markdown(
     tbody tr td {{
         font-size: 12px;
         padding: 6px;
+    }}
+
+    /* Inputs */
+    div[data-baseweb="input"] > div {{
+        background-color: #111827;
+        border-radius: 6px;
+        height: 36px;
+    }}
+
+    div[data-baseweb="select"] > div {{
+        background-color: #111827;
+        border-radius: 6px;
+        height: 36px;
     }}
     </style>
     """,
@@ -51,19 +65,14 @@ EPM_FILES = {
 }
 
 # =====================================================
-# COLOR FUNCTIONS (EPM STYLE)
+# COLOR FUNCTIONS
 # =====================================================
 def epm_bg(val):
-    if val >= 2.5:
-        return "background-color:#14532d"
-    if val >= 1.5:
-        return "background-color:#166534"
-    if val >= 0.5:
-        return "background-color:#1f2937"
-    if val >= -0.5:
-        return "background-color:#374151"
-    if val >= -1.5:
-        return "background-color:#7f1d1d"
+    if val >= 2.5: return "background-color:#14532d"
+    if val >= 1.5: return "background-color:#166534"
+    if val >= 0.5: return "background-color:#1f2937"
+    if val >= -0.5: return "background-color:#374151"
+    if val >= -1.5: return "background-color:#7f1d1d"
     return "background-color:#450a0a"
 
 def neutral_bg(_):
@@ -79,15 +88,27 @@ st.markdown(
 )
 
 # =====================================================
-# CONTROLS
+# CONTROLS (RIGHT-ALIGNED)
 # =====================================================
-c1, c2 = st.columns([1, 3])
+ctrl_l, ctrl_r = st.columns([5, 2])
 
-with c1:
-    season = st.selectbox("Season", list(EPM_FILES.keys()), index=3)
+with ctrl_r:
+    c1, c2 = st.columns([1, 1.4])
 
-with c2:
-    search = st.text_input("Search player")
+    with c1:
+        season = st.selectbox(
+            "Season",
+            list(EPM_FILES.keys()),
+            index=3,
+            label_visibility="collapsed"
+        )
+
+    with c2:
+        search = st.text_input(
+            "🔍",
+            placeholder="Search player",
+            label_visibility="collapsed"
+        )
 
 # =====================================================
 # LOAD DATA
@@ -114,12 +135,12 @@ df = epm.merge(
 # FILTER
 # =====================================================
 if search:
-    df = df[df["playerName"].str.contains(search, case=False)]
+    df = df[df["playerName"].str.contains(search, case=False, na=False)]
 
 df = df.sort_values("Total EPM", ascending=False).reset_index(drop=True)
 
 # =====================================================
-# SELECT + ORDER COLUMNS (D&T STYLE)
+# TABLE
 # =====================================================
 table = df[
     [
@@ -147,9 +168,6 @@ table.columns = [
     "KP",
 ]
 
-# =====================================================
-# STYLING
-# =====================================================
 styled = (
     table.style
     .applymap(epm_bg, subset=["OFF", "DEF", "EPM"])
@@ -172,9 +190,6 @@ styled = (
     ])
 )
 
-# =====================================================
-# RENDER TABLE
-# =====================================================
 st.dataframe(
     styled,
     use_container_width=True,
