@@ -22,21 +22,20 @@ GREEN_RGB = (34, 197, 94)
 st.markdown(
     f"""
     <style>
-        .stApp {{
-            background-color: {BG};
-            color: {TEXT};
-        }}
+        .stApp {{ background-color: {BG}; color: {TEXT}; }}
+
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
             font-size: 12px;
         }}
-        tbody tr td {{
-            font-size: 12px;
-            color: {TEXT};
-        }}
-        tbody tr:hover td {{
-            background-color: rgba(148,163,184,0.05);
+
+        tbody tr td {{ font-size: 12px; color: {TEXT}; }}
+        tbody tr:hover td {{ background-color: rgba(148,163,184,0.05); }}
+
+        .active-btn button {{
+            border: 1px solid #38bdf8 !important;
+            background-color: #1e293b !important;
         }}
     </style>
     """,
@@ -61,29 +60,35 @@ LEAGUES = {
     },
 }
 
+# =====================================================
+# SESSION STATE
+# =====================================================
 if "league" not in st.session_state:
     st.session_state.league = "eredivisie"
 
 # =====================================================
-# LEAGUE SWITCH
+# LEAGUE SWITCH (TOP BUTTONS)
 # =====================================================
 b1, b2, _ = st.columns([1, 1, 6])
 
 with b1:
-    if st.button(LEAGUES["eredivisie"]["label"]):
+    if st.button(LEAGUES["eredivisie"]["label"], key="btn_eredivisie"):
         st.session_state.league = "eredivisie"
+        st.cache_data.clear()  # 🔥 CRITICAL
 
 with b2:
-    if st.button(LEAGUES["belgium"]["label"]):
+    if st.button(LEAGUES["belgium"]["label"], key="btn_belgium"):
         st.session_state.league = "belgium"
+        st.cache_data.clear()  # 🔥 CRITICAL
 
-league = LEAGUES[st.session_state.league]
+league_key = st.session_state.league
+league = LEAGUES[league_key]
 
 # =====================================================
-# LOAD DATA
+# LOAD DATA (CACHE KEYED BY LEAGUE)
 # =====================================================
 @st.cache_data
-def load_data(event_file, epm_file):
+def load_data(league_key, event_file, epm_file):
     events = pd.read_excel(event_file)
     epm = pd.read_excel(epm_file)
 
@@ -98,7 +103,11 @@ def load_data(event_file, epm_file):
         how="left"
     )
 
-df = load_data(league["event"], league["epm"])
+df = load_data(
+    league_key,
+    league["event"],
+    league["epm"],
+)
 
 # =====================================================
 # HEADER
@@ -159,7 +168,7 @@ table = (
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# PERCENTILES (ALIGNED)
+# PERCENTILES
 # =====================================================
 if pos_pct:
     pct_table = table.groupby("POS")[numeric_cols].rank(pct=True)
@@ -167,25 +176,20 @@ else:
     pct_table = table[numeric_cols].rank(pct=True)
 
 # =====================================================
-# THRESHOLDED COLOR FUNCTION
+# SHADING
 # =====================================================
 def green_shade(pct):
     if pd.isna(pct) or pct < 0.60:
         return ""
-
     if pct < 0.80:
         alpha = 0.010
     elif pct < 0.95:
         alpha = 0.020
     else:
         alpha = 0.030
-
     r, g, b = GREEN_RGB
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
-# =====================================================
-# STYLER (CORRECT MODERN API)
-# =====================================================
 styler = table.style.format("{:.1f}", subset=numeric_cols)
 
 for col in numeric_cols:
@@ -207,7 +211,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Thresholded percentile shading • League switch via buttons
+        League switch is live • Cache correctly invalidated
     </small>
     """,
     unsafe_allow_html=True
