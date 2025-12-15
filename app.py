@@ -15,12 +15,10 @@ st.set_page_config(
 # =====================================================
 BG = "#0a0f1e"
 PANEL = "#0f172a"
-GRID = "#1e293b"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
 
-# RGBA GREEN (DARK, SUBTLE)
-GREEN_RGB = (34, 197, 94)  # tailwind green-500
+GREEN_RGB = (34, 197, 94)  # subtle green
 
 # =====================================================
 # GLOBAL STYLE
@@ -32,15 +30,32 @@ st.markdown(
             background-color: {BG};
             color: {TEXT};
         }}
+
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
             font-size: 12px;
         }}
+
+        tbody tr:hover td {{
+            background-color: rgba(148,163,184,0.08);
+        }}
+
         tbody tr td {{
-            color: {TEXT};
             font-size: 12px;
         }}
+
+        /* Sticky first 3 columns */
+        th:nth-child(-n+3), td:nth-child(-n+3) {{
+            position: sticky;
+            left: 0;
+            background-color: {BG};
+            z-index: 2;
+        }}
+
+        th:nth-child(1), td:nth-child(1) {{ left: 0px; }}
+        th:nth-child(2), td:nth-child(2) {{ left: 140px; }}
+        th:nth-child(3), td:nth-child(3) {{ left: 260px; }}
     </style>
     """,
     unsafe_allow_html=True
@@ -53,7 +68,7 @@ EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
 EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
 
 # =====================================================
-# LOAD DATA (ONLY 2025–26)
+# LOAD DATA
 # =====================================================
 @st.cache_data
 def load_data():
@@ -62,17 +77,14 @@ def load_data():
 
     if "Season" in events.columns:
         events = events[events["Season"] == "2025-2026"]
-
     if "Season" in epm.columns:
         epm = epm[epm["Season"] == "2025-2026"]
 
-    df = events.merge(
+    return events.merge(
         epm[["playerName", "Offensive EPM", "Defensive EPM", "Total EPM"]],
         on="playerName",
         how="left"
     )
-
-    return df
 
 df = load_data()
 
@@ -85,20 +97,26 @@ st.markdown(
         Estimated Plus-Minus
     </h1>
     <p style="color:#94a3b8;margin-top:6px;">
-        Eredivisie • 2025–26 season • Player impact model
+        Eredivisie • 2025–26 • Advanced player impact
     </p>
     """,
     unsafe_allow_html=True
 )
 
 # =====================================================
-# SEARCH
+# CONTROLS
 # =====================================================
-search = st.text_input(
-    "Search player",
-    placeholder="Search player",
-    label_visibility="collapsed"
-)
+c1, c2 = st.columns([3, 1])
+
+with c1:
+    search = st.text_input(
+        "Search player",
+        placeholder="Search player",
+        label_visibility="collapsed"
+    )
+
+with c2:
+    pos_pct = st.toggle("Position percentiles", value=True)
 
 if search:
     df = df[df["playerName"].str.lower().str.contains(search.lower())]
@@ -147,45 +165,47 @@ table = (
     .reset_index(drop=True)
 )
 
-# =====================================================
-# NUMERIC COLUMNS
-# =====================================================
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# SUBTLE PERCENTILE SHADING (RGBA)
+# POSITION-BASED PERCENTILES
 # =====================================================
-def green_shade(val, col):
+def percentile(series, val):
+    return series.rank(pct=True)[series == val].iloc[0]
+
+def green_shade(val, col, pos):
     if pd.isna(val):
         return ""
 
-    s = table[col]
-    pct = s.rank(pct=True)[s == val].iloc[0]
+    if pos_pct:
+        group = table[table["POS"] == pos][col]
+    else:
+        group = table[col]
 
-    # opacity range: very subtle → slightly visible
-    alpha = 0.08 + (pct ** 2) * 0.35
+    pct = percentile(group, val)
+    alpha = 0.06 + (pct ** 2) * 0.32
 
     r, g, b = GREEN_RGB
-    return (
-        f"background-color: rgba({r},{g},{b},{alpha});"
-        f"color: {TEXT};"
-    )
+    return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
 styler = (
     table.style
     .apply(
-        lambda s: [green_shade(v, s.name) for v in s],
+        lambda s: [
+            green_shade(v, s.name, table.loc[i, "POS"])
+            for i, v in enumerate(s)
+        ],
         subset=numeric_cols
     )
-    .format("{:.1f}", subset=numeric_cols)  # 🔑 ONE DECIMAL EVERYWHERE
+    .format("{:.1f}", subset=numeric_cols)
 )
 
 # =====================================================
-# FULL-WIDTH TABLE
+# DISPLAY
 # =====================================================
 st.dataframe(
     styler,
-    height=880,
+    height=900,
     use_container_width=True,
 )
 
@@ -196,7 +216,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Subtle green shading reflects percentile performance • One decimal precision
+        Percentile-based shading • Position-adjusted • One-decimal precision
     </small>
     """,
     unsafe_allow_html=True
