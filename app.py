@@ -11,12 +11,17 @@ st.set_page_config(
 )
 
 # =====================================================
-# COLORS
+# COLORS (BLUE THEME)
 # =====================================================
-BG = "#0b1220"
-GRID = "#334155"
+BG = "#0a0f1e"        # deep navy
+PANEL = "#0f172a"     # slate panel
+GRID = "#1e293b"
 TEXT = "#e5e7eb"
-DOT = "#e5e7eb"
+MUTED = "#94a3b8"
+
+BLUE_MAIN = "#38bdf8"
+BLUE_SOFT = "#0ea5e9"
+DOT = "#7dd3fc"
 
 # =====================================================
 # GLOBAL STYLE
@@ -29,12 +34,26 @@ st.markdown(
             color: {TEXT};
         }}
 
+        section[data-testid="stSidebar"] {{
+            background-color: {BG};
+        }}
+
         div[data-baseweb="select"] {{
-            max-width: 200px;
+            max-width: 220px;
         }}
 
         input {{
-            max-width: 200px;
+            max-width: 220px;
+        }}
+
+        thead tr th {{
+            background-color: {PANEL};
+            color: {MUTED};
+        }}
+
+        tbody tr td {{
+            background-color: {BG};
+            color: {TEXT};
         }}
     </style>
     """,
@@ -45,21 +64,29 @@ st.markdown(
 # FILES
 # =====================================================
 EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
-EPM_FILE = "data/Eredivisie EPM 2023-2024.xlsx"
+EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
 
 # =====================================================
-# LOAD DATA
+# LOAD DATA (ONLY 2025–2026)
 # =====================================================
 @st.cache_data
 def load_data():
     events = pd.read_excel(EVENT_FILE)
     epm = pd.read_excel(EPM_FILE)
 
+    # 🔒 HARD FILTER TO 2025–2026
+    if "Season" in events.columns:
+        events = events[events["Season"] == "2025-2026"]
+
+    if "Season" in epm.columns:
+        epm = epm[epm["Season"] == "2025-2026"]
+
     df = events.merge(
         epm[["playerName", "Offensive EPM", "Defensive EPM", "Total EPM"]],
         on="playerName",
         how="left"
     )
+
     return df
 
 df = load_data()
@@ -69,32 +96,24 @@ df = load_data()
 # =====================================================
 st.markdown(
     """
-    <h1 style="margin-bottom:0;">Eredivisie Estimated Plus-Minus</h1>
-    <p style="color:#9ca3af;margin-top:4px;">
-        Player impact model • Percentiles • Interactive
+    <h1 style="margin-bottom:0;font-weight:600;">
+        Estimated Plus-Minus
+    </h1>
+    <p style="color:#94a3b8;margin-top:6px;">
+        Eredivisie • 2025–26 season • Player impact model
     </p>
     """,
     unsafe_allow_html=True
 )
 
 # =====================================================
-# FILTER BAR
+# SEARCH
 # =====================================================
-f1, f2, f3 = st.columns([3, 1, 1])
-
-with f2:
-    season = st.selectbox(
-        "Season",
-        ["2023–2024"],
-        label_visibility="collapsed"
-    )
-
-with f3:
-    search = st.text_input(
-        "🔍",
-        placeholder="Search player",
-        label_visibility="collapsed"
-    )
+search = st.text_input(
+    "Search player",
+    placeholder="Search player",
+    label_visibility="collapsed"
+)
 
 # =====================================================
 # FILTER DATA
@@ -114,7 +133,7 @@ if search:
 left, right = st.columns([1.15, 1])
 
 # =====================================================
-# LEFT — TABLE ONLY
+# LEFT — TABLE
 # =====================================================
 with left:
 
@@ -139,14 +158,18 @@ with left:
         .reset_index(drop=True)
     )
 
+    table_show["OFF"] = table_show["OFF"].round(2)
+    table_show["DEF"] = table_show["DEF"].round(2)
+    table_show["EPM"] = table_show["EPM"].round(2)
+
     st.dataframe(
         table_show,
-        height=780,
-        width="stretch",
+        height=800,
+        use_container_width=True,
     )
 
 # =====================================================
-# RIGHT — BEESWARM (NO COLOR SCALE ❗)
+# RIGHT — BEESWARM
 # =====================================================
 with right:
 
@@ -162,11 +185,11 @@ with right:
     )
 
     fig.update_traces(
-        jitter=0.35,
+        jitter=0.28,
         marker=dict(
-            size=7,
+            size=6,
             color=DOT,
-            opacity=0.85,
+            opacity=0.75,
         )
     )
 
@@ -174,7 +197,7 @@ with right:
         height=820,
         paper_bgcolor=BG,
         plot_bgcolor=BG,
-        margin=dict(l=40, r=40, t=10, b=40),
+        margin=dict(l=50, r=30, t=10, b=40),
         xaxis=dict(
             showgrid=False,
             showticklabels=False,
@@ -183,23 +206,24 @@ with right:
         yaxis=dict(
             title="Estimated Plus-Minus",
             gridcolor=GRID,
+            zeroline=True,
             zerolinecolor=GRID,
-            tickfont=dict(color=TEXT),
-            titlefont=dict(color=TEXT),
+            tickfont=dict(color=TEXT, size=12),
+            titlefont=dict(color=TEXT, size=13),
         ),
         showlegend=False,
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 # =====================================================
 # FOOTER
 # =====================================================
 st.markdown(
     """
-    <hr style="border-color:#334155;">
-    <small style="color:#9ca3af;">
-        Hover dots for player details • Inspired by dunksandthrees.com
+    <hr style="border-color:#1e293b;">
+    <small style="color:#94a3b8;">
+        Hover dots for player details • Visual style inspired by dunksandthrees.com
     </small>
     """,
     unsafe_allow_html=True
