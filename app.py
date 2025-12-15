@@ -18,7 +18,7 @@ PANEL = "#0f172a"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
 
-GREEN_RGB = (34, 197, 94)  # subtle green
+GREEN_RGB = (34, 197, 94)  # Tailwind green-500
 
 # =====================================================
 # GLOBAL STYLE
@@ -30,18 +30,15 @@ st.markdown(
             background-color: {BG};
             color: {TEXT};
         }}
-
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
             font-size: 12px;
         }}
-
         tbody tr td {{
             font-size: 12px;
             color: {TEXT};
         }}
-
         tbody tr:hover td {{
             background-color: rgba(148,163,184,0.08);
         }}
@@ -70,13 +67,11 @@ def load_data():
     if "Season" in epm.columns:
         epm = epm[epm["Season"] == "2025-2026"]
 
-    df = events.merge(
+    return events.merge(
         epm[["playerName", "Offensive EPM", "Defensive EPM", "Total EPM"]],
         on="playerName",
         how="left"
     )
-
-    return df
 
 df = load_data()
 
@@ -160,7 +155,7 @@ table = (
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# PRECOMPUTE PERCENTILES (SAFE)
+# PRECOMPUTE PERCENTILES (ALIGNED)
 # =====================================================
 if pos_pct:
     pct_table = (
@@ -171,33 +166,32 @@ if pos_pct:
 else:
     pct_table = table[numeric_cols].rank(pct=True)
 
-# Safety check (can remove later)
-assert table.index.equals(pct_table.index)
-
 # =====================================================
-# SUBTLE GREEN SHADING
+# CELL-LEVEL SHADING FUNCTION
 # =====================================================
-def green_shade(pct):
-    if pd.isna(pct):
+def green_shade(val):
+    if pd.isna(val):
         return ""
 
-    # opacity curve: very subtle
-    alpha = 0.06 + (pct ** 2) * 0.32
+    alpha = 0.06 + (val ** 2) * 0.32
     r, g, b = GREEN_RGB
-
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
-styler = (
-    table.style
-    .apply(
-        lambda _: pct_table.applymap(green_shade),
-        subset=numeric_cols
+# =====================================================
+# STYLER (CORRECT USAGE)
+# =====================================================
+styler = table.style
+
+for col in numeric_cols:
+    styler = styler.applymap(
+        green_shade,
+        subset=pd.IndexSlice[:, col]
     )
-    .format("{:.1f}", subset=numeric_cols)
-)
+
+styler = styler.format("{:.1f}", subset=numeric_cols)
 
 # =====================================================
-# DISPLAY TABLE (FULL WIDTH)
+# DISPLAY
 # =====================================================
 st.dataframe(
     styler,
