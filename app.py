@@ -6,7 +6,7 @@ import numpy as np
 # PAGE CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="Eredivisie EPM",
+    page_title="Estimated Plus-Minus",
     layout="wide",
 )
 
@@ -18,7 +18,7 @@ PANEL = "#0f172a"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
 
-GREEN_RGB = (34, 197, 94)  # muted green
+GREEN_RGB = (34, 197, 94)
 
 # =====================================================
 # GLOBAL STYLE
@@ -30,17 +30,36 @@ st.markdown(
             background-color: {BG};
             color: {TEXT};
         }}
+
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
             font-size: 12px;
         }}
+
         tbody tr td {{
             font-size: 12px;
             color: {TEXT};
         }}
+
         tbody tr:hover td {{
             background-color: rgba(148,163,184,0.05);
+        }}
+
+        .league-btn {{
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: 1px solid #1e293b;
+            background-color: #020617;
+            color: #cbd5f5;
+            font-weight: 500;
+            cursor: pointer;
+        }}
+
+        .league-btn-active {{
+            background-color: #1e293b;
+            border-color: #38bdf8;
+            color: #e5e7eb;
         }}
     </style>
     """,
@@ -48,18 +67,51 @@ st.markdown(
 )
 
 # =====================================================
-# FILES
+# DATA CONFIG
 # =====================================================
-EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
-EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
+LEAGUES = {
+    "eredivisie": {
+        "label": "🇳🇱 Eredivisie",
+        "event_file": "data/eredivisie_event_metrics_merged_final.xlsx",
+        "epm_file": "data/Eredivisie EPM 2025-2026.xlsx",
+        "title": "Eredivisie",
+    },
+    "belgium": {
+        "label": "🇧🇪 Belgium",
+        "event_file": "data/belgium_event_metrics_merged_final.xlsx",
+        "epm_file": "data/Belgium EPM 2025-2026.xlsx",
+        "title": "Belgium Pro League",
+    },
+}
 
 # =====================================================
-# LOAD DATA (ONLY 2025–26)
+# SESSION STATE
+# =====================================================
+if "league" not in st.session_state:
+    st.session_state.league = "eredivisie"
+
+# =====================================================
+# LEAGUE SWITCH BUTTONS
+# =====================================================
+b1, b2, _ = st.columns([1, 1, 6])
+
+with b1:
+    if st.button(LEAGUES["eredivisie"]["label"], use_container_width=True):
+        st.session_state.league = "eredivisie"
+
+with b2:
+    if st.button(LEAGUES["belgium"]["label"], use_container_width=True):
+        st.session_state.league = "belgium"
+
+league = LEAGUES[st.session_state.league]
+
+# =====================================================
+# LOAD DATA
 # =====================================================
 @st.cache_data
-def load_data():
-    events = pd.read_excel(EVENT_FILE)
-    epm = pd.read_excel(EPM_FILE)
+def load_data(event_file, epm_file):
+    events = pd.read_excel(event_file)
+    epm = pd.read_excel(epm_file)
 
     if "Season" in events.columns:
         events = events[events["Season"] == "2025-2026"]
@@ -73,18 +125,18 @@ def load_data():
         how="left"
     )
 
-df = load_data()
+df = load_data(league["event_file"], league["epm_file"])
 
 # =====================================================
 # HEADER
 # =====================================================
 st.markdown(
-    """
+    f"""
     <h1 style="margin-bottom:0;font-weight:600;">
         Estimated Plus-Minus
     </h1>
     <p style="color:#94a3b8;margin-top:6px;">
-        Eredivisie • 2025–26 • Advanced player impact
+        {league["title"]} • 2025–26 • Advanced player impact
     </p>
     """,
     unsafe_allow_html=True
@@ -109,7 +161,7 @@ if search:
     df = df[df["playerName"].str.lower().str.contains(search.lower())]
 
 # =====================================================
-# TABLE DATA
+# TABLE
 # =====================================================
 table = (
     df[
@@ -155,29 +207,20 @@ table = (
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# PRECOMPUTE PERCENTILES
+# PERCENTILES
 # =====================================================
 if pos_pct:
-    pct_table = (
-        table
-        .groupby("POS")[numeric_cols]
-        .rank(pct=True)
-    )
+    pct_table = table.groupby("POS")[numeric_cols].rank(pct=True)
 else:
     pct_table = table[numeric_cols].rank(pct=True)
 
 # =====================================================
-# THRESHOLDED SHADING (KEY FIX)
+# SHADING (THRESHOLDED)
 # =====================================================
 def green_shade(pct):
-    if pd.isna(pct):
+    if pd.isna(pct) or pct < 0.60:
         return ""
 
-    # No color for most values
-    if pct < 0.60:
-        return ""
-
-    # Carefully stepped opacity
     if pct < 0.80:
         alpha = 0.012
     elif pct < 0.95:
@@ -188,9 +231,6 @@ def green_shade(pct):
     r, g, b = GREEN_RGB
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
-# =====================================================
-# STYLER
-# =====================================================
 styler = table.style
 
 for col in numeric_cols:
@@ -217,7 +257,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Green shading only highlights above-average and elite percentiles
+        Percentile-based shading • Click buttons to switch leagues
     </small>
     """,
     unsafe_allow_html=True
