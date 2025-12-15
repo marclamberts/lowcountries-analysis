@@ -18,7 +18,7 @@ PANEL = "#0f172a"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
 
-GREEN_RGB = (34, 197, 94)  # Tailwind green-500
+GREEN_RGB = (34, 197, 94)  # muted green
 
 # =====================================================
 # GLOBAL STYLE
@@ -40,7 +40,7 @@ st.markdown(
             color: {TEXT};
         }}
         tbody tr:hover td {{
-            background-color: rgba(148,163,184,0.06);
+            background-color: rgba(148,163,184,0.05);
         }}
     </style>
     """,
@@ -155,7 +155,7 @@ table = (
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# PRECOMPUTE PERCENTILES (SAFE)
+# PRECOMPUTE PERCENTILES
 # =====================================================
 if pos_pct:
     pct_table = (
@@ -167,20 +167,21 @@ else:
     pct_table = table[numeric_cols].rank(pct=True)
 
 # =====================================================
-# VERY SUBTLE SHADING
+# ULTRA-SUBTLE SHADING (HARD CAPPED)
 # =====================================================
 def green_shade(pct):
     if pd.isna(pct):
         return ""
 
-    # extremely restrained opacity
-    alpha = 0.015 + pct * 0.07
-    r, g, b = GREEN_RGB
+    # Extremely restrained opacity
+    # min ≈ 0.008, max ≈ 0.035
+    alpha = 0.008 + pct * 0.027
 
+    r, g, b = GREEN_RGB
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
 # =====================================================
-# STYLER (CORRECT + SAFE)
+# STYLER
 # =====================================================
 styler = table.style
 
@@ -208,7 +209,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Very subtle percentile shading • Position-adjusted • One-decimal precision
+        Ultra-subtle percentile shading • Position-adjusted • One-decimal precision
     </small>
     """,
     unsafe_allow_html=True
