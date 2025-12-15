@@ -50,6 +50,25 @@ st.markdown(
 )
 
 # =====================================================
+# LEAGUE MENU (THIS IS THE KEY CHANGE)
+# =====================================================
+league = st.selectbox(
+    "League",
+    ["🇳🇱 Eredivisie", "🇧🇪 Belgium"],
+    index=0,
+)
+
+# Map league → files
+if league == "🇳🇱 Eredivisie":
+    LEAGUE_NAME = "Eredivisie"
+    EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
+    EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
+else:
+    LEAGUE_NAME = "Belgium Pro League"
+    EVENT_FILE = "data/belgium_event_metrics_merged_final.xlsx"
+    EPM_FILE = "data/Belgium EPM 2025-2026.xlsx"
+
+# =====================================================
 # DATA LOADER
 # =====================================================
 @st.cache_data
@@ -68,26 +87,6 @@ def load_data(event_file, epm_file):
         on="playerName",
         how="left"
     )
-
-# =====================================================
-# SIDEBAR — PAGE SWITCH
-# =====================================================
-page = st.sidebar.radio(
-    "League",
-    ["🇳🇱 Eredivisie", "🇧🇪 Belgium"],
-)
-
-# =====================================================
-# PAGE CONFIG
-# =====================================================
-if page == "🇳🇱 Eredivisie":
-    LEAGUE_NAME = "Eredivisie"
-    EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
-    EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
-else:
-    LEAGUE_NAME = "Belgium Pro League"
-    EVENT_FILE = "data/belgium_event_metrics_merged_final.xlsx"
-    EPM_FILE = "data/Belgium EPM 2025-2026.xlsx"
 
 df = load_data(EVENT_FILE, EPM_FILE)
 
@@ -196,7 +195,7 @@ def green_shade(pct):
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
 # =====================================================
-# STYLER (NO DEPRECATED APIs)
+# STYLER (MODERN API ONLY)
 # =====================================================
 styler = table.style.format("{:.1f}", subset=numeric_cols)
 
@@ -223,7 +222,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Use the sidebar to switch leagues • Percentile-based shading
+        Select league from the menu above • Percentile-based shading
     </small>
     """,
     unsafe_allow_html=True
