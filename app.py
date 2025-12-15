@@ -19,9 +19,8 @@ GRID = "#1e293b"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
 
-GREEN_LOW = "#052e16"
-GREEN_MID = "#166534"
-GREEN_HIGH = "#22c55e"
+# RGBA GREEN (DARK, SUBTLE)
+GREEN_RGB = (34, 197, 94)  # tailwind green-500
 
 # =====================================================
 # GLOBAL STYLE
@@ -149,40 +148,36 @@ table = (
 )
 
 # =====================================================
-# ROUNDING
-# =====================================================
-round_cols = ["OFF", "DEF", "EPM", "xG", "xA", "AERIAL %"]
-for c in round_cols:
-    if c in table.columns:
-        table[c] = table[c].round(2)
-
-# =====================================================
-# PERCENTILE COLORING
+# NUMERIC COLUMNS
 # =====================================================
 numeric_cols = table.select_dtypes(include=np.number).columns
 
-def green_scale(val, col):
+# =====================================================
+# SUBTLE PERCENTILE SHADING (RGBA)
+# =====================================================
+def green_shade(val, col):
     if pd.isna(val):
         return ""
 
-    series = table[col]
-    pct = (series.rank(pct=True).loc[series == val].iloc[0])
+    s = table[col]
+    pct = s.rank(pct=True)[s == val].iloc[0]
 
-    if pct > 0.85:
-        color = GREEN_HIGH
-    elif pct > 0.65:
-        color = GREEN_MID
-    else:
-        color = GREEN_LOW
+    # opacity range: very subtle → slightly visible
+    alpha = 0.08 + (pct ** 2) * 0.35
 
-    return f"background-color: {color}; color: #ecfdf5;"
+    r, g, b = GREEN_RGB
+    return (
+        f"background-color: rgba({r},{g},{b},{alpha});"
+        f"color: {TEXT};"
+    )
 
 styler = (
     table.style
     .apply(
-        lambda s: [green_scale(v, s.name) for v in s],
+        lambda s: [green_shade(v, s.name) for v in s],
         subset=numeric_cols
     )
+    .format("{:.1f}", subset=numeric_cols)  # 🔑 ONE DECIMAL EVERYWHERE
 )
 
 # =====================================================
@@ -190,7 +185,7 @@ styler = (
 # =====================================================
 st.dataframe(
     styler,
-    height=860,
+    height=880,
     use_container_width=True,
 )
 
@@ -201,7 +196,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Green-shaded values represent relative performance (percentile-based)
+        Subtle green shading reflects percentile performance • One decimal precision
     </small>
     """,
     unsafe_allow_html=True
