@@ -40,7 +40,7 @@ st.markdown(
             color: {TEXT};
         }}
         tbody tr:hover td {{
-            background-color: rgba(148,163,184,0.08);
+            background-color: rgba(148,163,184,0.06);
         }}
     </style>
     """,
@@ -155,7 +155,7 @@ table = (
 numeric_cols = table.select_dtypes(include=np.number).columns
 
 # =====================================================
-# PRECOMPUTE PERCENTILES (ALIGNED)
+# PRECOMPUTE PERCENTILES (SAFE)
 # =====================================================
 if pos_pct:
     pct_table = (
@@ -167,18 +167,20 @@ else:
     pct_table = table[numeric_cols].rank(pct=True)
 
 # =====================================================
-# CELL-LEVEL SHADING FUNCTION
+# VERY SUBTLE SHADING
 # =====================================================
-def green_shade(val):
-    if pd.isna(val):
+def green_shade(pct):
+    if pd.isna(pct):
         return ""
 
-    alpha = 0.06 + (val ** 2) * 0.32
+    # extremely restrained opacity
+    alpha = 0.015 + pct * 0.07
     r, g, b = GREEN_RGB
+
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
 # =====================================================
-# STYLER (CORRECT USAGE)
+# STYLER (CORRECT + SAFE)
 # =====================================================
 styler = table.style
 
@@ -206,7 +208,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Percentile-based shading • Position-adjusted • One-decimal precision
+        Very subtle percentile shading • Position-adjusted • One-decimal precision
     </small>
     """,
     unsafe_allow_html=True
