@@ -167,15 +167,23 @@ else:
     pct_table = table[numeric_cols].rank(pct=True)
 
 # =====================================================
-# ULTRA-SUBTLE SHADING (HARD CAPPED)
+# THRESHOLDED SHADING (KEY FIX)
 # =====================================================
 def green_shade(pct):
     if pd.isna(pct):
         return ""
 
-    # Extremely restrained opacity
-    # min ≈ 0.008, max ≈ 0.035
-    alpha = 0.008 + pct * 0.027
+    # No color for most values
+    if pct < 0.60:
+        return ""
+
+    # Carefully stepped opacity
+    if pct < 0.80:
+        alpha = 0.012
+    elif pct < 0.95:
+        alpha = 0.025
+    else:
+        alpha = 0.040
 
     r, g, b = GREEN_RGB
     return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
@@ -209,7 +217,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Ultra-subtle percentile shading • Position-adjusted • One-decimal precision
+        Green shading only highlights above-average and elite percentiles
     </small>
     """,
     unsafe_allow_html=True
