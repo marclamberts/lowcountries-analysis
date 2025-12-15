@@ -5,7 +5,10 @@ import numpy as np
 # =====================================================
 # PAGE CONFIG
 # =====================================================
-st.set_page_config(page_title="Estimated Plus-Minus", layout="wide")
+st.set_page_config(
+    page_title="Estimated Plus-Minus",
+    layout="wide",
+)
 
 # =====================================================
 # COLORS
@@ -22,7 +25,10 @@ GREEN_RGB = (34, 197, 94)
 st.markdown(
     f"""
     <style>
-        .stApp {{ background-color: {BG}; color: {TEXT}; }}
+        .stApp {{
+            background-color: {BG};
+            color: {TEXT};
+        }}
 
         thead tr th {{
             background-color: {PANEL};
@@ -64,132 +70,151 @@ def load_data(event_file, epm_file):
     )
 
 # =====================================================
-# RENDER FUNCTION
+# SIDEBAR — PAGE SWITCH
 # =====================================================
-def render_league(league_name, event_file, epm_file, key_prefix):
-    df = load_data(event_file, epm_file)
+page = st.sidebar.radio(
+    "League",
+    ["🇳🇱 Eredivisie", "🇧🇪 Belgium"],
+)
 
-    st.markdown(
-        f"""
-        <h1 style="margin-bottom:0;font-weight:600;">Estimated Plus-Minus</h1>
-        <p style="color:#94a3b8;margin-top:6px;">
-            {league_name} • 2025–26 • Advanced player impact
-        </p>
-        """,
-        unsafe_allow_html=True
+# =====================================================
+# PAGE CONFIG
+# =====================================================
+if page == "🇳🇱 Eredivisie":
+    LEAGUE_NAME = "Eredivisie"
+    EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
+    EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
+else:
+    LEAGUE_NAME = "Belgium Pro League"
+    EVENT_FILE = "data/belgium_event_metrics_merged_final.xlsx"
+    EPM_FILE = "data/Belgium EPM 2025-2026.xlsx"
+
+df = load_data(EVENT_FILE, EPM_FILE)
+
+# =====================================================
+# HEADER
+# =====================================================
+st.markdown(
+    f"""
+    <h1 style="margin-bottom:0;font-weight:600;">
+        Estimated Plus-Minus
+    </h1>
+    <p style="color:#94a3b8;margin-top:6px;">
+        {LEAGUE_NAME} • 2025–26 • Advanced player impact
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
+# =====================================================
+# CONTROLS
+# =====================================================
+c1, c2 = st.columns([3, 1])
+
+with c1:
+    search = st.text_input(
+        "Search player",
+        placeholder="Search player",
+        label_visibility="collapsed"
     )
 
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        search = st.text_input(
-            "Search player",
-            key=f"search_{key_prefix}",
-            label_visibility="collapsed"
-        )
-    with c2:
-        pos_pct = st.toggle(
-            "Position percentiles",
-            value=True,
-            key=f"pospct_{key_prefix}"
-        )
+with c2:
+    pos_pct = st.toggle("Position percentiles", value=True)
 
-    if search:
-        df = df[df["playerName"].str.lower().str.contains(search.lower())]
+if search:
+    df = df[df["playerName"].str.lower().str.contains(search.lower())]
 
-    table = (
-        df[
-            [
-                "playerName",
-                "Team within selected timeframe",
-                "Position",
-                "Offensive EPM",
-                "Defensive EPM",
-                "Total EPM",
-                "xG",
-                "xA",
-                "Goals",
-                "Assists",
-                "Key passes",
-                "Shots",
-                "Touches in box",
-                "Tackles",
-                "Interceptions",
-                "Shots blocked",
-                "Aerial duels won, %",
-            ]
+# =====================================================
+# TABLE
+# =====================================================
+table = (
+    df[
+        [
+            "playerName",
+            "Team within selected timeframe",
+            "Position",
+
+            "Offensive EPM",
+            "Defensive EPM",
+            "Total EPM",
+
+            "xG",
+            "xA",
+            "Goals",
+            "Assists",
+            "Key passes",
+            "Shots",
+            "Touches in box",
+
+            "Tackles",
+            "Interceptions",
+            "Shots blocked",
+            "Aerial duels won, %",
         ]
-        .rename(columns={
-            "playerName": "PLAYER",
-            "Team within selected timeframe": "TEAM",
-            "Position": "POS",
-            "Offensive EPM": "OFF",
-            "Defensive EPM": "DEF",
-            "Total EPM": "EPM",
-            "Touches in box": "BOX",
-            "Key passes": "KP",
-            "Shots blocked": "BLK",
-            "Aerial duels won, %": "AERIAL %",
-        })
-        .sort_values("EPM", ascending=False)
-        .reset_index(drop=True)
-    )
+    ]
+    .rename(columns={
+        "playerName": "PLAYER",
+        "Team within selected timeframe": "TEAM",
+        "Position": "POS",
+        "Offensive EPM": "OFF",
+        "Defensive EPM": "DEF",
+        "Total EPM": "EPM",
+        "Touches in box": "BOX",
+        "Key passes": "KP",
+        "Shots blocked": "BLK",
+        "Aerial duels won, %": "AERIAL %",
+    })
+    .sort_values("EPM", ascending=False)
+    .reset_index(drop=True)
+)
 
-    numeric_cols = table.select_dtypes(include=np.number).columns
+numeric_cols = table.select_dtypes(include=np.number).columns
 
-    # Percentiles
-    if pos_pct:
-        pct_table = table.groupby("POS")[numeric_cols].rank(pct=True)
+# =====================================================
+# PERCENTILES
+# =====================================================
+if pos_pct:
+    pct_table = table.groupby("POS")[numeric_cols].rank(pct=True)
+else:
+    pct_table = table[numeric_cols].rank(pct=True)
+
+# =====================================================
+# SHADING FUNCTION (THRESHOLDED)
+# =====================================================
+def green_shade(pct):
+    if pd.isna(pct) or pct < 0.60:
+        return ""
+
+    if pct < 0.80:
+        alpha = 0.010
+    elif pct < 0.95:
+        alpha = 0.020
     else:
-        pct_table = table[numeric_cols].rank(pct=True)
+        alpha = 0.030
 
-    # Thresholded subtle shading
-    def green_shade(pct):
-        if pd.isna(pct) or pct < 0.60:
-            return ""
-        if pct < 0.80:
-            alpha = 0.010
-        elif pct < 0.95:
-            alpha = 0.020
-        else:
-            alpha = 0.030
-        r, g, b = GREEN_RGB
-        return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
+    r, g, b = GREEN_RGB
+    return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
-    styler = table.style.format("{:.1f}", subset=numeric_cols)
+# =====================================================
+# STYLER (NO DEPRECATED APIs)
+# =====================================================
+styler = table.style.format("{:.1f}", subset=numeric_cols)
 
-    for col in numeric_cols:
-        styler = styler.map(
-            green_shade,
-            subset=pd.IndexSlice[:, col],
-            data=pct_table[col]
-        )
-
-    st.dataframe(
-        styler,
-        height=900,
-        width="stretch",   # ✅ correct API
+for col in numeric_cols:
+    styler = styler.map(
+        green_shade,
+        subset=pd.IndexSlice[:, col],
+        data=pct_table[col]
     )
 
 # =====================================================
-# TABS
+# DISPLAY
 # =====================================================
-tab_nl, tab_be = st.tabs(["🇳🇱 Eredivisie", "🇧🇪 Belgium"])
-
-with tab_nl:
-    render_league(
-        "Eredivisie",
-        "data/eredivisie_event_metrics_merged_final.xlsx",
-        "data/Eredivisie EPM 2025-2026.xlsx",
-        "nl",
-    )
-
-with tab_be:
-    render_league(
-        "Belgium Pro League",
-        "data/belgium_event_metrics_merged_final.xlsx",
-        "data/Belgium EPM 2025-2026.xlsx",
-        "be",
-    )
+st.dataframe(
+    styler,
+    height=900,
+    width="stretch",
+)
 
 # =====================================================
 # FOOTER
@@ -198,7 +223,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Tabs switch leagues • No deprecated APIs • Warning-free
+        Use the sidebar to switch leagues • Percentile-based shading
     </small>
     """,
     unsafe_allow_html=True
