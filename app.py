@@ -13,14 +13,11 @@ st.set_page_config(
 # =====================================================
 # COLORS (BLUE THEME)
 # =====================================================
-BG = "#0a0f1e"        # deep navy
-PANEL = "#0f172a"     # slate panel
+BG = "#0a0f1e"
+PANEL = "#0f172a"
 GRID = "#1e293b"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
-
-BLUE_MAIN = "#38bdf8"
-BLUE_SOFT = "#0ea5e9"
 DOT = "#7dd3fc"
 
 # =====================================================
@@ -33,27 +30,16 @@ st.markdown(
             background-color: {BG};
             color: {TEXT};
         }}
-
-        section[data-testid="stSidebar"] {{
-            background-color: {BG};
-        }}
-
-        div[data-baseweb="select"] {{
-            max-width: 220px;
-        }}
-
-        input {{
-            max-width: 220px;
-        }}
-
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
         }}
-
         tbody tr td {{
             background-color: {BG};
             color: {TEXT};
+        }}
+        input {{
+            max-width: 240px;
         }}
     </style>
     """,
@@ -74,7 +60,6 @@ def load_data():
     events = pd.read_excel(EVENT_FILE)
     epm = pd.read_excel(EPM_FILE)
 
-    # 🔒 HARD FILTER TO 2025–2026
     if "Season" in events.columns:
         events = events[events["Season"] == "2025-2026"]
 
@@ -130,22 +115,41 @@ if search:
 # =====================================================
 # MAIN LAYOUT
 # =====================================================
-left, right = st.columns([1.15, 1])
+left, right = st.columns([1.25, 1])
 
 # =====================================================
-# LEFT — TABLE
+# LEFT — TABLE (EXTENDED METRICS)
 # =====================================================
 with left:
 
     table_show = (
-        table_df[[
-            "playerName",
-            "Team within selected timeframe",
-            "Position",
-            "Offensive EPM",
-            "Defensive EPM",
-            "Total EPM",
-        ]]
+        table_df[
+            [
+                "playerName",
+                "Team within selected timeframe",
+                "Position",
+
+                # EPM
+                "Offensive EPM",
+                "Defensive EPM",
+                "Total EPM",
+
+                # Attacking
+                "xG",
+                "xA",
+                "Goals",
+                "Assists",
+                "Key passes",
+                "Shots",
+                "Touches in box",
+
+                # Defending / duels
+                "Tackles",
+                "Interceptions",
+                "Shots blocked",
+                "Aerial duels won, %",
+            ]
+        ]
         .rename(columns={
             "playerName": "PLAYER",
             "Team within selected timeframe": "TEAM",
@@ -153,18 +157,26 @@ with left:
             "Offensive EPM": "OFF",
             "Defensive EPM": "DEF",
             "Total EPM": "EPM",
+            "Touches in box": "BOX TCH",
+            "Shots blocked": "BLK",
+            "Aerial duels won, %": "AERIAL %",
+            "Key passes": "KP",
         })
         .sort_values("EPM", ascending=False)
         .reset_index(drop=True)
     )
 
-    table_show["OFF"] = table_show["OFF"].round(2)
-    table_show["DEF"] = table_show["DEF"].round(2)
-    table_show["EPM"] = table_show["EPM"].round(2)
+    # Rounding
+    round_cols = [
+        "OFF", "DEF", "EPM", "xG", "xA", "AERIAL %"
+    ]
+    for c in round_cols:
+        if c in table_show.columns:
+            table_show[c] = table_show[c].round(2)
 
     st.dataframe(
         table_show,
-        height=800,
+        height=820,
         use_container_width=True,
     )
 
@@ -194,7 +206,7 @@ with right:
     )
 
     fig.update_layout(
-        height=820,
+        height=840,
         paper_bgcolor=BG,
         plot_bgcolor=BG,
         margin=dict(l=50, r=30, t=10, b=40),
@@ -208,8 +220,8 @@ with right:
             gridcolor=GRID,
             zeroline=True,
             zerolinecolor=GRID,
-            tickfont=dict(color=TEXT, size=12),
-            titlefont=dict(color=TEXT, size=13),
+            tickfont=dict(color=TEXT),
+            titlefont=dict(color=TEXT),
         ),
         showlegend=False,
     )
@@ -223,7 +235,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Hover dots for player details • Visual style inspired by dunksandthrees.com
+        Extended attacking & defensive metrics • Style inspired by dunksandthrees.com
     </small>
     """,
     unsafe_allow_html=True
