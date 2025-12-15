@@ -5,10 +5,7 @@ import numpy as np
 # =====================================================
 # PAGE CONFIG
 # =====================================================
-st.set_page_config(
-    page_title="Estimated Plus-Minus",
-    layout="wide",
-)
+st.set_page_config(page_title="Estimated Plus-Minus", layout="wide")
 
 # =====================================================
 # COLORS
@@ -25,10 +22,7 @@ GREEN_RGB = (34, 197, 94)
 st.markdown(
     f"""
     <style>
-        .stApp {{
-            background-color: {BG};
-            color: {TEXT};
-        }}
+        .stApp {{ background-color: {BG}; color: {TEXT}; }}
 
         thead tr th {{
             background-color: {PANEL};
@@ -70,22 +64,14 @@ def load_data(event_file, epm_file):
     )
 
 # =====================================================
-# SHARED RENDER FUNCTION
+# RENDER FUNCTION
 # =====================================================
-def render_league(
-    league_name: str,
-    event_file: str,
-    epm_file: str,
-    key_prefix: str,
-):
+def render_league(league_name, event_file, epm_file, key_prefix):
     df = load_data(event_file, epm_file)
 
-    # Header
     st.markdown(
         f"""
-        <h1 style="margin-bottom:0;font-weight:600;">
-            Estimated Plus-Minus
-        </h1>
+        <h1 style="margin-bottom:0;font-weight:600;">Estimated Plus-Minus</h1>
         <p style="color:#94a3b8;margin-top:6px;">
             {league_name} • 2025–26 • Advanced player impact
         </p>
@@ -93,16 +79,13 @@ def render_league(
         unsafe_allow_html=True
     )
 
-    # Controls
     c1, c2 = st.columns([3, 1])
-
     with c1:
         search = st.text_input(
             "Search player",
             key=f"search_{key_prefix}",
             label_visibility="collapsed"
         )
-
     with c2:
         pos_pct = st.toggle(
             "Position percentiles",
@@ -113,18 +96,15 @@ def render_league(
     if search:
         df = df[df["playerName"].str.lower().str.contains(search.lower())]
 
-    # Table
     table = (
         df[
             [
                 "playerName",
                 "Team within selected timeframe",
                 "Position",
-
                 "Offensive EPM",
                 "Defensive EPM",
                 "Total EPM",
-
                 "xG",
                 "xA",
                 "Goals",
@@ -132,7 +112,6 @@ def render_league(
                 "Key passes",
                 "Shots",
                 "Touches in box",
-
                 "Tackles",
                 "Interceptions",
                 "Shots blocked",
@@ -167,18 +146,15 @@ def render_league(
     def green_shade(pct):
         if pd.isna(pct) or pct < 0.60:
             return ""
-
         if pct < 0.80:
             alpha = 0.010
         elif pct < 0.95:
             alpha = 0.020
         else:
             alpha = 0.030
-
         r, g, b = GREEN_RGB
         return f"background-color: rgba({r},{g},{b},{alpha}); color:{TEXT};"
 
-    # Styler (modern API)
     styler = table.style.format("{:.1f}", subset=numeric_cols)
 
     for col in numeric_cols:
@@ -191,28 +167,28 @@ def render_league(
     st.dataframe(
         styler,
         height=900,
-        width="stretch",
+        width="stretch",   # ✅ correct API
     )
 
 # =====================================================
-# TABS (VISIBLE, STABLE)
+# TABS
 # =====================================================
 tab_nl, tab_be = st.tabs(["🇳🇱 Eredivisie", "🇧🇪 Belgium"])
 
 with tab_nl:
     render_league(
-        league_name="Eredivisie",
-        event_file="data/eredivisie_event_metrics_merged_final.xlsx",
-        epm_file="data/Eredivisie EPM 2025-2026.xlsx",
-        key_prefix="nl",
+        "Eredivisie",
+        "data/eredivisie_event_metrics_merged_final.xlsx",
+        "data/Eredivisie EPM 2025-2026.xlsx",
+        "nl",
     )
 
 with tab_be:
     render_league(
-        league_name="Belgium Pro League",
-        event_file="data/belgium_event_metrics_merged_final.xlsx",
-        epm_file="data/Belgium EPM 2025-2026.xlsx",
-        key_prefix="be",
+        "Belgium Pro League",
+        "data/belgium_event_metrics_merged_final.xlsx",
+        "data/Belgium EPM 2025-2026.xlsx",
+        "be",
     )
 
 # =====================================================
@@ -222,7 +198,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Switch leagues using tabs • Percentile-based shading • One-decimal precision
+        Tabs switch leagues • No deprecated APIs • Warning-free
     </small>
     """,
     unsafe_allow_html=True
