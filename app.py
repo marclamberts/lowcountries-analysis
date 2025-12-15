@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import numpy as np
 
 # =====================================================
 # PAGE CONFIG
@@ -11,14 +11,17 @@ st.set_page_config(
 )
 
 # =====================================================
-# COLORS (BLUE THEME)
+# COLORS
 # =====================================================
 BG = "#0a0f1e"
 PANEL = "#0f172a"
 GRID = "#1e293b"
 TEXT = "#e5e7eb"
 MUTED = "#94a3b8"
-DOT = "#7dd3fc"
+
+GREEN_LOW = "#052e16"
+GREEN_MID = "#166534"
+GREEN_HIGH = "#22c55e"
 
 # =====================================================
 # GLOBAL STYLE
@@ -33,13 +36,11 @@ st.markdown(
         thead tr th {{
             background-color: {PANEL};
             color: {MUTED};
+            font-size: 12px;
         }}
         tbody tr td {{
-            background-color: {BG};
             color: {TEXT};
-        }}
-        input {{
-            max-width: 240px;
+            font-size: 12px;
         }}
     </style>
     """,
@@ -53,7 +54,7 @@ EVENT_FILE = "data/eredivisie_event_metrics_merged_final.xlsx"
 EPM_FILE = "data/Eredivisie EPM 2025-2026.xlsx"
 
 # =====================================================
-# LOAD DATA (ONLY 2025–2026)
+# LOAD DATA (ONLY 2025–26)
 # =====================================================
 @st.cache_data
 def load_data():
@@ -100,133 +101,98 @@ search = st.text_input(
     label_visibility="collapsed"
 )
 
-# =====================================================
-# FILTER DATA
-# =====================================================
-table_df = df.copy()
-
 if search:
-    table_df = table_df[
-        table_df["playerName"]
-        .str.lower()
-        .str.contains(search.lower())
-    ]
+    df = df[df["playerName"].str.lower().str.contains(search.lower())]
 
 # =====================================================
-# MAIN LAYOUT
+# TABLE DATA
 # =====================================================
-left, right = st.columns([1.25, 1])
+table = (
+    df[
+        [
+            "playerName",
+            "Team within selected timeframe",
+            "Position",
 
-# =====================================================
-# LEFT — TABLE (EXTENDED METRICS)
-# =====================================================
-with left:
+            "Offensive EPM",
+            "Defensive EPM",
+            "Total EPM",
 
-    table_show = (
-        table_df[
-            [
-                "playerName",
-                "Team within selected timeframe",
-                "Position",
+            "xG",
+            "xA",
+            "Goals",
+            "Assists",
+            "Key passes",
+            "Shots",
+            "Touches in box",
 
-                # EPM
-                "Offensive EPM",
-                "Defensive EPM",
-                "Total EPM",
-
-                # Attacking
-                "xG",
-                "xA",
-                "Goals",
-                "Assists",
-                "Key passes",
-                "Shots",
-                "Touches in box",
-
-                # Defending / duels
-                "Tackles",
-                "Interceptions",
-                "Shots blocked",
-                "Aerial duels won, %",
-            ]
+            "Tackles",
+            "Interceptions",
+            "Shots blocked",
+            "Aerial duels won, %",
         ]
-        .rename(columns={
-            "playerName": "PLAYER",
-            "Team within selected timeframe": "TEAM",
-            "Position": "POS",
-            "Offensive EPM": "OFF",
-            "Defensive EPM": "DEF",
-            "Total EPM": "EPM",
-            "Touches in box": "BOX TCH",
-            "Shots blocked": "BLK",
-            "Aerial duels won, %": "AERIAL %",
-            "Key passes": "KP",
-        })
-        .sort_values("EPM", ascending=False)
-        .reset_index(drop=True)
-    )
-
-    # Rounding
-    round_cols = [
-        "OFF", "DEF", "EPM", "xG", "xA", "AERIAL %"
     ]
-    for c in round_cols:
-        if c in table_show.columns:
-            table_show[c] = table_show[c].round(2)
-
-    st.dataframe(
-        table_show,
-        height=820,
-        use_container_width=True,
-    )
+    .rename(columns={
+        "playerName": "PLAYER",
+        "Team within selected timeframe": "TEAM",
+        "Position": "POS",
+        "Offensive EPM": "OFF",
+        "Defensive EPM": "DEF",
+        "Total EPM": "EPM",
+        "Touches in box": "BOX",
+        "Key passes": "KP",
+        "Shots blocked": "BLK",
+        "Aerial duels won, %": "AERIAL %",
+    })
+    .sort_values("EPM", ascending=False)
+    .reset_index(drop=True)
+)
 
 # =====================================================
-# RIGHT — BEESWARM
+# ROUNDING
 # =====================================================
-with right:
+round_cols = ["OFF", "DEF", "EPM", "xG", "xA", "AERIAL %"]
+for c in round_cols:
+    if c in table.columns:
+        table[c] = table[c].round(2)
 
-    fig = px.strip(
-        df,
-        y="Total EPM",
-        hover_data={
-            "playerName": True,
-            "Team within selected timeframe": True,
-            "Position": True,
-            "Total EPM": ":.2f",
-        },
+# =====================================================
+# PERCENTILE COLORING
+# =====================================================
+numeric_cols = table.select_dtypes(include=np.number).columns
+
+def green_scale(val, col):
+    if pd.isna(val):
+        return ""
+
+    series = table[col]
+    pct = (series.rank(pct=True).loc[series == val].iloc[0])
+
+    if pct > 0.85:
+        color = GREEN_HIGH
+    elif pct > 0.65:
+        color = GREEN_MID
+    else:
+        color = GREEN_LOW
+
+    return f"background-color: {color}; color: #ecfdf5;"
+
+styler = (
+    table.style
+    .apply(
+        lambda s: [green_scale(v, s.name) for v in s],
+        subset=numeric_cols
     )
+)
 
-    fig.update_traces(
-        jitter=0.28,
-        marker=dict(
-            size=6,
-            color=DOT,
-            opacity=0.75,
-        )
-    )
-
-    fig.update_layout(
-        height=840,
-        paper_bgcolor=BG,
-        plot_bgcolor=BG,
-        margin=dict(l=50, r=30, t=10, b=40),
-        xaxis=dict(
-            showgrid=False,
-            showticklabels=False,
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title="Estimated Plus-Minus",
-            gridcolor=GRID,
-            zeroline=True,
-            zerolinecolor=GRID,
-            tickfont=dict(color=TEXT),
-            titlefont=dict(color=TEXT),
-        ),
-        showlegend=False,
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
+# =====================================================
+# FULL-WIDTH TABLE
+# =====================================================
+st.dataframe(
+    styler,
+    height=860,
+    use_container_width=True,
+)
 
 # =====================================================
 # FOOTER
@@ -235,7 +201,7 @@ st.markdown(
     """
     <hr style="border-color:#1e293b;">
     <small style="color:#94a3b8;">
-        Extended attacking & defensive metrics • Style inspired by dunksandthrees.com
+        Green-shaded values represent relative performance (percentile-based)
     </small>
     """,
     unsafe_allow_html=True
